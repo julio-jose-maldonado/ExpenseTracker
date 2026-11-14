@@ -7,7 +7,7 @@ El contrato HTTP para el frontend tiene su propio changelog en [`docs/API_Fronte
 
 ## Historial
 
-### 2026-11-14 · _sha pendiente_
+### 2026-11-14 · d885c89
 
 #### chore: bootstrap the three-layer backend with gRPC, PostgreSQL and CI
 
@@ -26,7 +26,7 @@ El contrato HTTP para el frontend tiene su propio changelog en [`docs/API_Fronte
 
 ## Dependencias iniciales
 
-Base del bootstrap: commit `_sha pendiente_` del 2026-11-14. Las entradas del Historial registran **solo cambios** respecto de esta base; si un paquete no aparece en el Historial, no cambió desde el bootstrap.
+Base del bootstrap: commit `d885c89` del 2026-11-14. Las entradas del Historial registran **solo cambios** respecto de esta base; si un paquete no aparece en el Historial, no cambió desde el bootstrap.
 
 **Paquetes internos** (`workspace:*`)
 

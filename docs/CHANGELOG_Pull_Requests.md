@@ -5,7 +5,7 @@ El detalle técnico por commit está en [`Backend/CHANGELOG.md`](../Backend/CHAN
 
 ### 2026-11-14 · feature/bootstrap → develop
 
-**Last commit:** _pending_ (the branch has no commits yet)
+**Last commit:** `d885c89` — `chore: bootstrap three-layer backend with gRPC, PostgreSQL, CI and docs`
 
 **Title:** chore: bootstrap three-layer backend with gRPC, PostgreSQL, CI and docs
 

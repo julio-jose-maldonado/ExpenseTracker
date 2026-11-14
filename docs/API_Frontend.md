@@ -7,7 +7,7 @@ Las capas internas (Business, DataAccess) no se exponen: el frontend solo habla 
 
 La entrada más nueva arriba, con el SHA completo y la fecha del commit que cambió el contrato.
 
-### 2026-11-14 · _sha pendiente_
+### 2026-11-14 · d885c8936b77ab6586c0a8dda2e6dfdffb1ae85c
 
 - Contrato inicial: formato de respuesta, códigos de error, `x-request-id`, `GET /isAlive` y `GET /isAliveChain`.
 

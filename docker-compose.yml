@@ -1,0 +1,39 @@
+# Infra local: Postgres (RDS en AWS) y Valkey (ElastiCache Valkey en AWS).
+# Los servicios Node corren fuera de Docker por ahora (pnpm start en cada uno).
+# Puertos del host distintos de los default para no chocar con otros Postgres/Redis locales.
+name: expense-tracker
+
+services:
+  postgres:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_SUPERUSER_PASSWORD:?copiá .env.example a .env y completalo}
+      POSTGRES_DB: expense_tracker
+      # Los usa Database/Init para crear los roles (solo en el primer arranque del volumen).
+      MIGRATOR_PASSWORD: ${MIGRATOR_PASSWORD:?copiá .env.example a .env y completalo}
+      APP_PASSWORD: ${APP_PASSWORD:?copiá .env.example a .env y completalo}
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5433}:5432"
+    volumes:
+      # Postgres 18 guarda los datos en un subdirectorio por versión: se monta el padre.
+      - postgres-data:/var/lib/postgresql
+      - ./Backend/DataAccess/Database/Init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d expense_tracker"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  valkey:
+    image: valkey/valkey:8-alpine
+    ports:
+      - "127.0.0.1:${VALKEY_PORT:-6380}:6379"
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  postgres-data:

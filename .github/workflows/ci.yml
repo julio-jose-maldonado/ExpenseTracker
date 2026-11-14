@@ -1,0 +1,100 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+
+# Solo lectura: ningún job necesita escribir en el repo.
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+# Actions fijadas por SHA de commit (el tag queda en el comentario): un tag movido no puede cambiar lo que corre.
+jobs:
+  checks:
+    name: Typecheck, tests, lint, architecture
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0 (versión de package.json#packageManager)
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # Un solo build; los scripts raíz `typecheck` y `test` vuelven a compilar (útil en local, no acá).
+      - run: pnpm build
+      - run: pnpm -r typecheck
+      - run: pnpm -r test
+      - run: pnpm lint
+      - run: pnpm depcruise
+
+  integration:
+    name: Integration tests (PostgreSQL)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      # Contraseñas aleatorias por corrida: la base vive solo lo que dura el job.
+      - name: Generate database passwords
+        run: |
+          for name in POSTGRES_SUPERUSER_PASSWORD MIGRATOR_PASSWORD APP_PASSWORD; do
+            value="$(openssl rand -hex 16)"
+            echo "::add-mask::$value"
+            echo "$name=$value" >> "$GITHUB_ENV"
+          done
+      # Mismo compose y mismo script de roles que en local.
+      - run: docker compose up -d --wait postgres
+      - name: Run integration tests
+        working-directory: Backend/DataAccess
+        env:
+          DATABASE_HOST: localhost
+          DATABASE_PORT: '5433'
+          DATABASE_NAME: expense_tracker
+          DATABASE_USER: expense_app
+          MIGRATOR_DATABASE_USER: expense_migrator
+        run: |
+          DATABASE_PASSWORD="$APP_PASSWORD" MIGRATOR_DATABASE_PASSWORD="$MIGRATOR_PASSWORD" \
+            pnpm test:integration
+      - name: Postgres logs on failure
+        if: failure()
+        run: docker compose logs postgres
+
+  secrets:
+    name: Secret scan (gitleaks)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    env:
+      GITLEAKS_VERSION: 8.30.1
+      # De gitleaks_8.30.1_checksums.txt del release oficial.
+      GITLEAKS_SHA256: 551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # todo el historial, no solo el último commit
+          persist-credentials: false
+      # Binario oficial con checksum verificado, en vez de una action de terceros.
+      - name: Install gitleaks
+        run: |
+          archive="gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          curl -fsSL -o "$RUNNER_TEMP/$archive" \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/$archive"
+          echo "$GITLEAKS_SHA256  $RUNNER_TEMP/$archive" | sha256sum --check --strict
+          tar -xzf "$RUNNER_TEMP/$archive" -C "$RUNNER_TEMP" gitleaks
+      - run: '"$RUNNER_TEMP/gitleaks" git . --redact --no-banner -v'

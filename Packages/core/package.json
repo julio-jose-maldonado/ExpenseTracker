@@ -1,0 +1,17 @@
+{
+  "name": "@expense-tracker/core",
+  "version": "0.0.0",
+  "private": true,
+  "type": "commonjs",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "jest"
+  },
+  "dependencies": {
+    "@grpc/grpc-js": "1.14.7",
+    "pino": "10.4.0"
+  }
+}

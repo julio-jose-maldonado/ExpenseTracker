@@ -1,0 +1,15 @@
+syntax = "proto3";
+
+package health.v1;
+
+// Lo implementan Negocio y Datos. Cada capa responde ok solo si
+// ella y todo lo que tiene "abajo" está vivo (usado por /isAliveChain).
+service HealthService {
+  rpc Check(CheckRequest) returns (CheckResponse);
+}
+
+message CheckRequest {}
+
+message CheckResponse {
+  bool ok = 1;
+}

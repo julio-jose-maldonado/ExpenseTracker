@@ -1,0 +1,28 @@
+{
+  "name": "@expense-tracker/gateway",
+  "version": "0.0.0",
+  "private": true,
+  "type": "commonjs",
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "jest",
+    "start": "node --env-file-if-exists=.env dist/index.js"
+  },
+  "dependencies": {
+    "@expense-tracker/core": "workspace:*",
+    "@expense-tracker/proto": "workspace:*",
+    "@grpc/grpc-js": "1.14.7",
+    "express": "5.3.0",
+    "helmet": "8.3.0",
+    "i18next": "27.0.1",
+    "reflect-metadata": "0.2.2",
+    "tsyringe": "4.10.0"
+  },
+  "devDependencies": {
+    "@expense-tracker/testing": "workspace:*",
+    "@types/express": "5.0.6",
+    "@types/supertest": "7.2.1",
+    "supertest": "7.3.2"
+  }
+}

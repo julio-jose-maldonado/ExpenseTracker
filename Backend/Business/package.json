@@ -1,0 +1,22 @@
+{
+  "name": "@expense-tracker/business",
+  "version": "0.0.0",
+  "private": true,
+  "type": "commonjs",
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "jest",
+    "start": "node --env-file-if-exists=.env dist/index.js"
+  },
+  "dependencies": {
+    "@expense-tracker/core": "workspace:*",
+    "@expense-tracker/proto": "workspace:*",
+    "@grpc/grpc-js": "1.14.7",
+    "reflect-metadata": "0.2.2",
+    "tsyringe": "4.10.0"
+  },
+  "devDependencies": {
+    "@expense-tracker/testing": "workspace:*"
+  }
+}

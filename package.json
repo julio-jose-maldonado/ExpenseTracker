@@ -1,0 +1,26 @@
+{
+  "name": "expense-tracker",
+  "private": true,
+  "type": "commonjs",
+  "packageManager": "pnpm@11.1.1",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r build && pnpm -r typecheck",
+    "test": "pnpm -r build && pnpm -r test",
+    "lint": "oxlint",
+    "depcruise": "depcruise Backend Packages --config .dependency-cruiser.cjs"
+  },
+  "devDependencies": {
+    "@swc/core": "1.16.22",
+    "@swc/jest": "0.2.39",
+    "@types/jest": "30.0.0",
+    "@types/node": "24.19.2",
+    "dependency-cruiser": "18.7.2",
+    "jest": "30.5.2",
+    "oxlint": "1.92.0",
+    "typescript": "7.0.2"
+  }
+}

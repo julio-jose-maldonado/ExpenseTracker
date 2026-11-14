@@ -1,0 +1,67 @@
+# Changelog técnico del Backend
+
+Cambios técnicos de `Backend/` (Gateway, Business, DataAccess) y de los paquetes compartidos de backend (`Packages/core`, `Packages/proto`, `Packages/testing`).
+El contrato HTTP para el frontend tiene su propio changelog en [`docs/API_Frontend.md`](../docs/API_Frontend.md); las decisiones y su porqué, en [`docs/Decisiones_Tecnicas.md`](../docs/Decisiones_Tecnicas.md).
+
+**Cómo se escribe:** una entrada por commit, antes del push, la más nueva arriba. Encabezado `### YYYY-MM-DD · shortsha` y título `####` con el asunto del commit. Si el commit toca algún `package.json`, va una sub-sección **Dependencias** con `` `paquete`: anterior → nueva `` (`—` si se agrega o se quita).
+
+## Historial
+
+### 2026-11-14 · d885c89
+
+#### chore: bootstrap the three-layer backend with gRPC, PostgreSQL and CI
+
+- Monorepo pnpm en la raíz (`App/`, `Backend/*`, `Packages/*`), TypeScript 7, Jest con SWC, oxlint y dependency-cruiser con las reglas de capas.
+- `Packages/proto`: contrato `health.v1.HealthService` (buf + ts-proto). `Packages/core`: `AppError` + `ErrorCode`, `handleUnary`/`callUnary`, logger pino con `request_id` por AsyncLocalStorage, `readRequiredEnv`. `Packages/testing`: servidor gRPC falso y logger silencioso.
+- Gateway (Express 5): `/isAlive` y `/isAliveChain`, request id validado, helmet, body de hasta 50 kb, errores `{ error: { code, message } }` traducidos con i18next (400, 404, 413, 500, 503).
+- Business: health que consulta a DataAccess por gRPC.
+- DataAccess: Drizzle + `pg` con pool (timeouts de conexión y de query); health con `select 1` contra Postgres.
+- `docker-compose.yml` con Postgres 18 y Valkey 8; `Database/Init/01-CreateRoles.sh` crea los roles `expense_migrator` (DDL) y `expense_app` (DML).
+- Variables de entorno: `.env.example` en la raíz (compose) y en cada servicio. DataAccess suma `DATABASE_HOST`, `DATABASE_PORT`, `DATABASE_NAME`, `DATABASE_USER`, `DATABASE_PASSWORD`, `MIGRATOR_DATABASE_USER`, `MIGRATOR_DATABASE_PASSWORD`.
+- Scripts de DataAccess: `test:integration`, `db:generate`, `db:migrate`. Los tres servicios cargan su `.env` con `node --env-file-if-exists`.
+- Arranque y apagado: errores de `listen` y `unhandledRejection` terminan el proceso con 1; los clientes gRPC y el pool se cierran al apagar.
+- Tests: 18 unitarios (sin Docker) y 3 de integración (roles de Postgres).
+- CI (GitHub Actions): chequeos, tests de integración y gitleaks sobre todo el historial.
+- **Dependencias:** ver la base inicial al final del archivo.
+
+## Dependencias iniciales
+
+Base del bootstrap: commit `d885c89` del 2026-11-14. Las entradas del Historial registran **solo cambios** respecto de esta base; si un paquete no aparece en el Historial, no cambió desde el bootstrap.
+
+**Paquetes internos** (`workspace:*`)
+
+| Paquete | Gateway | Business | DataAccess |
+|---|---|---|---|
+| `@expense-tracker/core` | ✓ | ✓ | ✓ |
+| `@expense-tracker/proto` | ✓ | ✓ | ✓ |
+| `@expense-tracker/testing` (dev) | ✓ | ✓ | ✓ |
+
+**Runtime**
+
+| Paquete | Gateway | Business | DataAccess | core | proto |
+|---|---|---|---|---|---|
+| `@grpc/grpc-js` | 1.14.7 | 1.14.7 | 1.14.7 | 1.14.7 | 1.14.7 |
+| `tsyringe` | 4.10.0 | 4.10.0 | 4.10.0 | — | — |
+| `reflect-metadata` | 0.2.2 | 0.2.2 | 0.2.2 | — | — |
+| `express` | 5.3.0 | — | — | — | — |
+| `helmet` | 8.3.0 | — | — | — | — |
+| `i18next` | 27.0.1 | — | — | — | — |
+| `drizzle-orm` | — | — | 0.45.4 | — | — |
+| `pg` | — | — | 8.23.1 | — | — |
+| `pino` | — | — | — | 10.4.0 | — |
+| `@bufbuild/protobuf` | — | — | — | — | 2.17.0 |
+
+**Desarrollo**
+
+| Paquete | Dónde | Versión |
+|---|---|---|
+| `typescript` | raíz | 7.0.2 |
+| `jest` · `@swc/jest` · `@swc/core` | raíz | 30.5.2 · 0.2.39 · 1.16.22 |
+| `@types/jest` · `@types/node` | raíz | 30.0.0 · 24.19.2 |
+| `oxlint` | raíz | 1.92.0 |
+| `dependency-cruiser` | raíz | 18.7.2 |
+| `supertest` · `@types/supertest` · `@types/express` | Gateway | 7.3.2 · 7.2.1 · 5.0.6 |
+| `drizzle-kit` · `@types/pg` | DataAccess | 0.31.11 · 8.23.1 |
+| `@bufbuild/buf` · `ts-proto` | proto | 1.75.0 · 2.18.4 |
+
+**Actual (referencia rápida):** sin cambios desde el bootstrap.

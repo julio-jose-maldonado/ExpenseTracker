@@ -5,7 +5,7 @@ El detalle técnico por commit está en [`Backend/CHANGELOG.md`](../Backend/CHAN
 
 ### 2026-11-15 · feature/service-dependencies → develop
 
-**Last commit:** _sha pendiente_ — `refactor(backend): pass service dependencies as a defaulted last parameter`
+**Last commit:** `43c3cc1` — `refactor(backend): pass service dependencies as a defaulted last parameter`
 
 **Title:** refactor(backend): pass service dependencies as a defaulted last parameter
 

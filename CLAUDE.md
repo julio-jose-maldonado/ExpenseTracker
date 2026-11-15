@@ -68,6 +68,8 @@ ExpenseTracker/      workspace pnpm (los comandos se corren desde la raíz)
 - dependency-cruiser con `parser: "swc"` para hacer cumplir las capas (no necesita la API de TS).
 - gRPC con `@grpc/grpc-js` + tipos generados con `ts-proto` (vía `buf`), contratos en `Packages/proto`.
 - Tests: Jest + supertest (con SWC).
+- Capas por dominio: `5.ExternalServices` hace la llamada cruda hacia afuera; `4.Repositories` es el adaptador detrás de una interfaz que solo usa tipos del dominio (nunca proto ni filas de Drizzle).
+- Services como funciones, con las dependencias en el último parámetro: un objeto desestructurado con `container.resolve(...)` como default de cada propiedad (`{ repo = container.resolve(...) } = {}`). En Business y DataAccess el primer parámetro es siempre el request gRPC.
 - Base: Drizzle ORM + `pg` (reemplaza a TypeORM). Esquema en TS, un archivo por dominio dentro de DataAccess; tipos con `$inferSelect`/`$inferInsert` que no salen de DataAccess. Migraciones `.sql` generadas con `drizzle-kit`, aplicadas por el rol `migrator`.
 - Auth a mano (no Better Auth: necesita acceso directo a la base y rompe la regla de que solo DataAccess toca Postgres). Sesión en cookie `httpOnly` manejada por el Gateway, guardada en Redis.
 - Reglas de validación compartidas (largo y regex de contraseña, monedas) como constantes en `Packages/types`: las usan express-validator en el Gateway y React Hook Form en la App. Sin zod.

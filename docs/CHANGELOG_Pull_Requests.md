@@ -3,6 +3,34 @@
 Registro del título y la descripción de cada PR, tal como se pegaron en GitHub (en inglés). El más nuevo arriba.
 El detalle técnico por commit está en [`Backend/CHANGELOG.md`](../Backend/CHANGELOG.md) y el contrato HTTP en [`docs/API_Frontend.md`](API_Frontend.md).
 
+### 2026-11-15 · feature/service-dependencies → develop
+
+**Last commit:** _sha pendiente_ — `refactor(backend): pass service dependencies as a defaulted last parameter`
+
+**Title:** refactor(backend): pass service dependencies as a defaulted last parameter
+
+**Description:**
+
+## Summary
+
+Service functions no longer look up their dependencies inside the function body. Each one now takes them as its last parameter: a destructured object where every dependency defaults to the tsyringe container. The signature shows what a service depends on, and a unit test can pass a fake directly, without the container or a fake gRPC server. Also documents the rule for layers 4 and 5 (ports and adapters). No behavior changes.
+
+## Changes
+
+### Backend
+- Gateway `checkChainHealth`, Business `checkHealth` and Data Access `checkHealth`: the dependency moves from a `container.resolve(...)` call in the body to the last parameter, `{ dependency = container.resolve(...) } = {}`. A test can replace one dependency while the others still come from the container. Controllers are unchanged.
+- Business and Data Access: `checkHealth` now declares the gRPC request as its first parameter (`_request`), which is what `handleUnary` passes.
+- New unit tests for the three services that pass the dependency by hand. The Gateway one covers the "Business reports not ok" case, which had no test.
+
+### docs
+- `docs/Decisiones_Tecnicas.md`: new entry. `5.ExternalServices` makes the raw outbound call; `4.Repositories` is the adapter behind an interface that only uses domain types (never ts-proto messages or Drizzle rows), so replacing an external service only touches layer 5 and the adapter. Also records the dependency convention and the alternatives that were discarded.
+- `CLAUDE.md`: the same two conventions.
+- `Backend/CHANGELOG.md` and this file.
+
+## Endpoints
+
+No changes.
+
 ### 2026-11-15 · feature/app-skeleton → develop
 
 **Last commit:** `d189c64` — `feat(app): add web app skeleton with end-to-end health check`

@@ -1,0 +1,7 @@
+{
+  "//": "Solo para dependency-cruiser: el tsconfig base más el alias @/ de la App (App/tsconfig.json), para que resuelva sus imports.",
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "paths": { "@/*": ["./App/src/*"] }
+  }
+}

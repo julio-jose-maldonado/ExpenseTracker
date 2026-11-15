@@ -3,6 +3,44 @@
 Registro del título y la descripción de cada PR, tal como se pegaron en GitHub (en inglés). El más nuevo arriba.
 El detalle técnico por commit está en [`Backend/CHANGELOG.md`](../Backend/CHANGELOG.md) y el contrato HTTP en [`docs/API_Frontend.md`](API_Frontend.md).
 
+### 2026-11-14 · feature/app-skeleton → develop
+
+**Last commit:** _sha pendiente_ — `feat(app): add web app skeleton with end-to-end health check`
+
+**Title:** feat(app): add web app skeleton with end-to-end health check
+
+**Description:**
+
+## Summary
+
+Adds the web app skeleton (`App/`): Vite + React 19 with Tailwind 4, shadcn/ui, TanStack Query and i18next (es / en). Its only screen is a status card that calls the end-to-end health check (`/isAliveChain`) and shows whether the whole chain works. The app always calls the Gateway through `/api` on its own origin. Locally, Vite proxies `/api` to the Gateway; on AWS, CloudFront will do the same. No backend code changes.
+
+## Changes
+
+### App
+- Vite 8 + React 19 + TypeScript 7 (`tsc --noEmit` for type checks), `@/` path alias.
+- Tailwind 4 + shadcn/ui (neutral theme, light/dark following `prefers-color-scheme`, including the `dark:` variant), `Button` and `Card` components.
+- i18next with its own instance, Spanish by default and English, with typed keys.
+- `apiClient`: `apiGet` unwraps `{ data }` and throws `ApiError` with the Gateway's `code` and translated `message`. Network failures and 2xx responses without the `data` envelope use the `NETWORK` code.
+- `ChainHealthCard` + `useChainHealth` (TanStack Query, no silent retries): shows loading, OK, or the error message and code, with a Retry button. A failed retry replaces a previous OK.
+- Vite dev proxy: only `/api/...` is forwarded to `GATEWAY_URL` (default `http://localhost:3000`), with the prefix removed.
+- 5 Vitest + Testing Library tests.
+
+### Repository and tooling
+- oxlint: `react`, `jsx-a11y` and `vitest` plugins.
+- dependency-cruiser also checks `App/src`, with new rules: the app cannot import backend code (only the future `Packages/types`), and the backend cannot import the app. A `tsconfig.depcruise.json` resolves the app's `@/` alias, and a new `not-to-unresolvable` rule fails on any import it cannot resolve, so no import silently skips the other rules.
+- Root `typecheck` and `test` no longer build the app bundle; `pnpm build` (and CI) still do.
+
+### docs
+- `docs/Decisiones_Tecnicas.md`: web app skeleton decisions, and a new entry on configuration and secrets on AWS (Secrets Manager, task definitions / SSM Parameter Store, one IAM role per service).
+- `docs/Desarrollo_Local.md`, `README.md`, `CLAUDE.md`: how to run the app.
+- `docs/API_Frontend.md`: the app calls the Gateway through `/api`.
+- `Backend/CHANGELOG.md` and this file.
+
+## Endpoints
+
+No new routes. The app reaches the existing Gateway routes through `/api` (for example, `/api/isAliveChain` → `/isAliveChain`).
+
 ### 2026-11-14 · feature/bootstrap → develop
 
 **Last commit:** `d885c89` — `chore: bootstrap three-layer backend with gRPC, PostgreSQL, CI and docs`

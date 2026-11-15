@@ -1,0 +1,21 @@
+{
+  // No extiende tsconfig.base.json: el backend compila a CommonJS para Node; esto lo empaqueta Vite para el navegador.
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "strict": true,
+    "noEmit": true,
+    "isolatedModules": true,
+    "verbatimModuleSyntax": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "noUncheckedIndexedAccess": true,
+    "types": ["vite/client", "vitest/globals", "@testing-library/jest-dom/vitest"],
+    // TS 7 no tiene baseUrl: el alias de shadcn va solo con paths.
+    "paths": { "@/*": ["./src/*"] }
+  },
+  "include": ["src", "vite.config.ts"]
+}

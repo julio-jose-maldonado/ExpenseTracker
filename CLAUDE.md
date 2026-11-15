@@ -49,6 +49,7 @@ ExpenseTracker/      workspace pnpm (los comandos se corren desde la raíz)
 
 - `pnpm build` · `pnpm typecheck` · `pnpm test` · `pnpm lint` · `pnpm depcruise`
 - `docker compose up -d --wait` (Postgres + Valkey) · `pnpm --filter @expense-tracker/data-access test:integration` · `... db:generate` / `db:migrate`
+- App: `pnpm --filter @expense-tracker/app dev` (http://localhost:5173, proxy `/api` → Gateway). Tests del front con Vitest.
 - Variables y pasos para levantar todo: `docs/Desarrollo_Local.md`
 
 ## Documentación a mantener

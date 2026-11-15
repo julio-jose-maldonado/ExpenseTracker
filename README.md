@@ -45,8 +45,8 @@ On AWS, each service will run as its own ECS Fargate service, with only the Gate
 | Backend | Node 24, TypeScript 7, Express 5 (Gateway), gRPC with `@grpc/grpc-js` + `ts-proto` (via `buf`), tsyringe for DI |
 | Data | PostgreSQL 18, Drizzle ORM + `pg`, SQL migrations with `drizzle-kit` |
 | Cache / sessions | Valkey (Redis-compatible): Docker locally, ElastiCache Valkey on AWS |
-| Frontend *(planned)* | React + Vite, TanStack Query, shadcn/ui + Tailwind, React Hook Form, i18n (es / en) |
-| Quality | Jest + supertest (transformed with SWC), oxlint, dependency-cruiser |
+| Frontend | React 19 + Vite 8, TanStack Query, shadcn/ui + Tailwind 4, i18next (es / en). React Hook Form and Zustand come with the first user story |
+| Quality | Jest + supertest (backend, transformed with SWC), Vitest + Testing Library (frontend), oxlint, dependency-cruiser |
 | Infra *(planned)* | AWS CDK in TypeScript: ECS Fargate (3 services), RDS, ElastiCache, S3 + CloudFront, ALB in front of the Gateway only |
 | Repo | pnpm workspace monorepo |
 
@@ -55,7 +55,7 @@ On AWS, each service will run as its own ECS Fargate service, with only the Gate
 ## Repository layout
 
 ```
-App/               React web app (planned)
+App/               React web app (calls the Gateway through /api on the same origin)
 Backend/
 ├── Gateway/       public REST API
 ├── Business/      domain rules
@@ -84,13 +84,14 @@ Docker Compose and each service read their own `.env` file: copy the `.env.examp
 ```sh
 curl localhost:3000/isAlive         # Gateway only
 curl localhost:3000/isAliveChain    # Gateway → Business → Data Access → PostgreSQL
+pnpm --filter @expense-tracker/app dev   # web app on http://localhost:5173
 ```
 
 ### Checks
 
 ```sh
 pnpm typecheck
-pnpm test          # unit tests, no Docker needed
+pnpm test          # unit tests (backend and web app), no Docker needed
 pnpm lint
 pnpm depcruise     # architecture rules
 pnpm --filter @expense-tracker/data-access test:integration   # against the Docker PostgreSQL
@@ -105,7 +106,7 @@ Work in progress.
 - [x] Monorepo, tooling and architecture rules
 - [x] Skeleton of the three services with an end-to-end health check over gRPC
 - [x] PostgreSQL and Valkey in Docker, database roles, Drizzle
-- [ ] Web app skeleton
+- [x] Web app skeleton (Vite, Tailwind, shadcn/ui, TanStack Query, i18n) showing the end-to-end health check
 - [ ] Sign up and log an expense *(first user story)*
 - [ ] Log in / log out, edit and delete expenses, multi-currency, monthly totals, password recovery, language selection
 - [ ] AWS deployment with CDK

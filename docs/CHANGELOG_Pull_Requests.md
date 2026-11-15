@@ -3,9 +3,9 @@
 Registro del título y la descripción de cada PR, tal como se pegaron en GitHub (en inglés). El más nuevo arriba.
 El detalle técnico por commit está en [`Backend/CHANGELOG.md`](../Backend/CHANGELOG.md) y el contrato HTTP en [`docs/API_Frontend.md`](API_Frontend.md).
 
-### 2026-11-14 · feature/app-skeleton → develop
+### 2026-11-15 · feature/app-skeleton → develop
 
-**Last commit:** _sha pendiente_ — `feat(app): add web app skeleton with end-to-end health check`
+**Last commit:** `d189c64` — `feat(app): add web app skeleton with end-to-end health check`
 
 **Title:** feat(app): add web app skeleton with end-to-end health check
 

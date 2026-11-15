@@ -7,7 +7,7 @@ Las capas internas (Business, DataAccess) no se exponen: el frontend solo habla 
 
 La entrada más nueva arriba, con el SHA completo y la fecha del commit que cambió el contrato.
 
-### 2026-11-14 · _sha pendiente_
+### 2026-11-15 · d189c64a2e37c100cbdfe1fa945a7f46b66e0a17
 
 - La App llama al Gateway por `/api` en su mismo origen (proxy de Vite en local, CloudFront en AWS). Las rutas del Gateway no cambian: el prefijo se saca antes de llegar.
 

@@ -7,7 +7,7 @@ El contrato HTTP para el frontend tiene su propio changelog en [`docs/API_Fronte
 
 ## Historial
 
-### 2026-11-14 · _sha pendiente_
+### 2026-11-15 · d189c64
 
 #### feat(app): add web app skeleton with end-to-end health check
 

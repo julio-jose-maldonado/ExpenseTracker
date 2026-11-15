@@ -5,7 +5,7 @@ El detalle técnico por commit está en [`Backend/CHANGELOG.md`](../Backend/CHAN
 
 ### 2026-11-15 · feature/grpc-errors-and-deadlines → develop
 
-**Last commit:** _sha pendiente_ — `feat(core): rebuild AppError across gRPC hops and propagate the deadline`
+**Last commit:** `0098175` — `feat(core): rebuild AppError across gRPC hops and propagate the deadline`
 
 **Title:** feat(core): rebuild AppError across gRPC hops and propagate the deadline
 

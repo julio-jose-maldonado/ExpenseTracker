@@ -7,7 +7,7 @@ El contrato HTTP para el frontend tiene su propio changelog en [`docs/API_Fronte
 
 ## Historial
 
-### 2026-11-15 · _sha pendiente_
+### 2026-11-15 · 0098175
 
 #### feat(core): rebuild AppError across gRPC hops and propagate the deadline
 

@@ -7,7 +7,7 @@ Las capas internas (Business, DataAccess) no se exponen: el frontend solo habla 
 
 La entrada más nueva arriba, con el SHA completo y la fecha del commit que cambió el contrato.
 
-### 2026-11-15 · _sha pendiente_
+### 2026-11-15 · 0098175344aef23f615b1836642e0a88a5525b46
 
 - `GET /isAliveChain`: responde 500 `INTERNAL` si una capa interna falla por un error inesperado (antes era siempre 503). El 503 `SERVICE_UNAVAILABLE` queda para cuando una capa o la base no responde. El corte pasa a ser de 3 s en total, no por salto.
 

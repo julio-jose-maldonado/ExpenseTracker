@@ -3,6 +3,54 @@
 Registro del título y la descripción de cada PR, tal como se pegaron en GitHub (en inglés). El más nuevo arriba.
 El detalle técnico por commit está en [`Backend/CHANGELOG.md`](../Backend/CHANGELOG.md) y el contrato HTTP en [`docs/API_Frontend.md`](API_Frontend.md).
 
+### 2026-11-15 · feature/grpc-errors-and-deadlines → develop
+
+**Last commit:** _sha pendiente_ — `feat(core): rebuild AppError across gRPC hops and propagate the deadline`
+
+**Title:** feat(core): rebuild AppError across gRPC hops and propagate the deadline
+
+**Description:**
+
+## Summary
+
+Finishes the gRPC plumbing the first user story needs. An error code raised in a lower layer now reaches the Gateway unchanged, the request deadline is shared across hops instead of restarting at each one, and the logs carry more context: the caller's IP, the gRPC method and one completion line per hop. No new routes.
+
+## Changes
+
+### Packages/core
+- `callUnary` always rejects with an `AppError`. It uses the `ErrorCode` sent in the gRPC `details`; without one it decides by gRPC status (`UNAVAILABLE` and `DEADLINE_EXCEEDED` become `SERVICE_UNAVAILABLE`, anything else `INTERNAL`). Codes that describe the client's HTTP request (`MALFORMED_REQUEST`, `PAYLOAD_TOO_LARGE`) do not cross layers: from an inner layer they arrive as `INTERNAL`. The original gRPC error is kept as `cause`. Errors that grpc-js throws before sending the call are converted too.
+- `grpcStatusFromError`: one gRPC status per `ErrorCode`, in a `Record<ErrorCode, status>` table, so a new code cannot be added without choosing its status. An unknown code falls back to `INTERNAL`.
+- Deadline propagation: `handleUnary` stores the incoming call deadline in the request context, and `callUnary` uses the earlier of that deadline and its own 3 s limit.
+- Request context is now a typed object (`requestId`, `deadline`, `clientIp`, `grpcMethod`) with one getter each. `runWithRequestContext` replaces `runWithRequestId`.
+- Logger: adds `client_ip` and `grpc_method` to every line when the context has them.
+- `handleUnary` logs one `grpc request completed` line per call with `grpc_status`, `error_code`, `duration_ms` and `cancelled` (true when the caller had already given up), plus a `warn` line at the moment the caller gives up, so a handler that never finishes still leaves a trace. It also turns a synchronous throw in a handler into `INTERNAL` and validates the request id received in the metadata.
+- Logger redaction: passwords, tokens, session ids, emails, cookies and `authorization` are replaced with `[REDACTED]`, up to two levels deep.
+- Log levels: only service failures (`INTERNAL`, `UNAVAILABLE`) are logged at `error` level; a domain error such as `NOT_FOUND` is an expected response.
+
+### Backend/Gateway
+- Stores the caller's IP in the request context, so every log line of the request includes `client_ip`. New optional variable `TRUSTED_PROXY_HOPS` (default 0, maximum 5) sets Express `trust proxy`: with 0, `X-Forwarded-For` is ignored because any client can forge it. A forwarded value that is not an IP falls back to the connection address.
+- Request log: adds `user_agent` (cut to 200 characters), cuts the path of unmatched requests to 200 characters, and the logged route keeps the router prefix when the handler fails (it used to log `/:id` instead of `/expenses/:id`).
+- `checkBusinessHealth` no longer wraps errors: the right `AppError` comes from `callUnary`.
+
+### Backend/Business
+- `checkDataAccessHealth` no longer wraps errors.
+
+### Tests
+- `core`: end-to-end tests for `callUnary` + `handleUnary` against a minimal gRPC service defined in the test (errors, deadlines, logs), plus context and log redaction tests.
+- Gateway: request log (route, user agent) and client IP (with 0, 1 and 2 trusted proxies, and validation of `TRUSTED_PROXY_HOPS`).
+- Two existing `core` tests now call `runWithRequestContext`.
+
+### docs
+- `docs/Decisiones_Tecnicas.md`: new entry for this batch, and a checklist for the infra stage on `TRUSTED_PROXY_HOPS` (the load balancer must only be reachable through CloudFront).
+- `docs/backlog.md`: plan for the next batches, including the rate limit design.
+- `docs/API_Frontend.md`, `docs/Desarrollo_Local.md`, `CLAUDE.md` (TDD as the way of working), `Backend/CHANGELOG.md` and this file.
+
+## Endpoints
+
+No new routes.
+
+- `GET /isAliveChain`: now answers 500 `INTERNAL` when an inner layer fails unexpectedly (it was always 503). 503 `SERVICE_UNAVAILABLE` remains for a layer or the database not answering. The cutoff is 3 s in total, not per hop.
+
 ### 2026-11-15 · feature/service-dependencies → develop
 
 **Last commit:** `43c3cc1` — `refactor(backend): pass service dependencies as a defaulted last parameter`

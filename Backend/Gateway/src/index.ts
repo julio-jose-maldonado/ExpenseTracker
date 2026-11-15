@@ -10,7 +10,7 @@ function main(): void {
   const config = loadEnvConfigs();
   registerContainerList({ businessGrpcAddress: config.businessGrpcAddress });
   // En Express 5 el callback de listen también corre si falla, con el error como argumento.
-  const httpServer = new App(logger).server.listen(config.port, (error?: Error) => {
+  const httpServer = new App(logger, { trustedProxyHops: config.trustedProxyHops }).server.listen(config.port, (error?: Error) => {
     if (!error) logger.info({ port: config.port }, 'gateway listening');
   });
   // Los errores de listen (puerto ocupado, sin permisos) llegan como evento, no como excepción.

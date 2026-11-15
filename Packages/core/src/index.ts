@@ -1,6 +1,10 @@
 export { readRequiredEnv } from './Config/ReadRequiredEnv';
+export { getClientIp } from './Context/GetClientIp';
+export { getGrpcMethod } from './Context/GetGrpcMethod';
+export { getRequestDeadline } from './Context/GetRequestDeadline';
 export { getRequestId } from './Context/GetRequestId';
-export { runWithRequestId } from './Context/RunWithRequestId';
+export { isValidRequestId } from './Context/IsValidRequestId';
+export { runWithRequestContext } from './Context/RunWithRequestContext';
 export { AppError } from './Errors/AppError';
 export { ErrorCode } from './Errors/ErrorCode';
 export { callUnary } from './Grpc/CallUnary';

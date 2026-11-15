@@ -52,6 +52,11 @@ ExpenseTracker/      workspace pnpm (los comandos se corren desde la raíz)
 - App: `pnpm --filter @expense-tracker/app dev` (http://localhost:5173, proxy `/api` → Gateway). Tests del front con Vitest.
 - Variables y pasos para levantar todo: `docs/Desarrollo_Local.md`
 
+## Forma de trabajo
+
+- **TDD:** primero los tests del comportamiento nuevo, correrlos y verlos fallar por el motivo esperado, y recién después la implementación. Si para algo no es viable, frenar y definir todo antes de implementar.
+- Los tests existentes no se cambian para acomodar un refactor sin preguntar antes.
+
 ## Documentación a mantener
 
 - `docs/API_Frontend.md`: contrato HTTP App ↔ Gateway. Si cambia, entrada arriba en su changelog con SHA completo + fecha.

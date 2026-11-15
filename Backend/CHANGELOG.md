@@ -7,6 +7,23 @@ El contrato HTTP para el frontend tiene su propio changelog en [`docs/API_Fronte
 
 ## Historial
 
+### 2026-11-15 · _sha pendiente_
+
+#### feat(core): rebuild AppError across gRPC hops and propagate the deadline
+
+- `core` · `callUnary`: rechaza siempre con un `AppError`. Usa el `ErrorCode` que viene en `details`; sin código, decide por el status gRPC (`UNAVAILABLE` y `DEADLINE_EXCEEDED` → `SERVICE_UNAVAILABLE`, el resto → `INTERNAL`). `MALFORMED_REQUEST` y `PAYLOAD_TOO_LARGE` no cruzan entre capas (llegan como `INTERNAL`). El error original queda como `cause` (`AppError` acepta `{ cause }`). También convierte los errores que grpc-js lanza antes de enviar la llamada. Nuevos `appErrorFromGrpcError` e `isErrorCode`.
+- `core` · `grpcStatusFromError`: tabla `Record<ErrorCode, status>` con un status por código (antes solo distinguía `SERVICE_UNAVAILABLE`); un código desconocido sale como `INTERNAL`.
+- `core` · `handleUnary`: guarda en el contexto el deadline y el método de la llamada (`grpc_method` en cada línea), y deja una línea de cierre por llamada con `grpc_status`, `error_code`, `cancelled` y `duration_ms`. `error` solo para `INTERNAL` y `UNAVAILABLE`. Registra un `warn` cuando el caller se va antes de la respuesta. Convierte en `INTERNAL` un throw sincrónico del handler y valida el request id de la metadata (`isValidRequestId`, que ahora también usa el Gateway).
+- `core` · contexto: `RequestContext` suma `deadline`, `clientIp` y `grpcMethod`, con sus getters. `runWithRequestContext` reemplaza a `runWithRequestId` (borrada).
+- `core` · `callUnary` usa el menor entre su límite (3 s) y el deadline heredado: los saltos ya no suman 3 s cada uno.
+- Gateway y Business: `checkBusinessHealth` y `checkDataAccessHealth` sin try/catch. `/isAliveChain` responde 500 (antes 503) si una capa falla por un error inesperado; 503 si no responde.
+- Gateway · log de requests: la ruta incluye el prefijo del router también cuando el handler falla.
+- IP del cliente: el Gateway la toma de `req.ip` y el logger agrega `client_ip` a cada línea del request. Variable opcional `TRUSTED_PROXY_HOPS` (0 por defecto, máximo 5) para `trust proxy`. Si el valor reenviado no es una IP, se usa la de la conexión.
+- Gateway · log de requests: suma `user_agent`, recortado a 200 caracteres; el path sin ruta también se recorta a 200.
+- `core` · logger: `redact` de pino ofusca con `[REDACTED]` contraseñas, tokens, id de sesión, email, cookies y `authorization`, hasta dos niveles de anidación.
+- Tests nuevos: en `core`, `Grpc/UnaryCalls` (24), `Grpc/GrpcStatusFromError` (3), `Context/RequestDeadline` (3), `Context/ClientIp` (4) y `Logs/Redact` (11); en el Gateway, `RequestLog` (8) y `ClientIp` (15). Dos tests existentes de `core` pasan a usar `runWithRequestContext`.
+- Sin cambios de dependencias.
+
 ### 2026-11-15 · 43c3cc1
 
 #### refactor(backend): pass service dependencies as a defaulted last parameter

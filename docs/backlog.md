@@ -31,3 +31,35 @@ Proyecto de práctica para aprender a desplegar en AWS y practicar gRPC.
 - Las categorías van en su propia tabla desde la v1 (con las fijas precargadas), para que la #11 no requiera migrar datos.
 - La #9 suma SES en AWS (modo sandbox alcanza para practicar).
 - #1, #2 y #9: no revelar si un email existe (mismo mensaje y una verificación de hash aunque el usuario no exista). Código o link de recuperación de un solo uso, con límite de intentos, y al resetear se cierran las sesiones abiertas.
+
+## Plan de tandas
+
+La historia #1 se hace en varias tandas, cada una con su PR. Se trabaja con TDD.
+
+| Tanda | Qué entra | Estado |
+|---|---|---|
+| 5 | Errores y deadline entre capas por gRPC, contexto del request (IP, método gRPC), logs por salto | Hecha |
+| 6 | Rate limit en el Gateway, con el cliente de Valkey | Siguiente |
+| 7 | Registro: primera migración, `Packages/types`, argon2id, express-validator | |
+| 8 | Sesión: cookie `httpOnly` guardada en Valkey, middleware de autenticación (login y logout quedan para la historia #2) | |
+| 9 | Gastos: migración de categorías y gastos, crear y listar por usuario, pantallas de la App | |
+
+### Tanda 6 · Rate limit (definido el 2026-11-15)
+
+- **Una política por request:** hay un límite general por defecto y un endpoint puede tener el suyo, más alto o más bajo, que reemplaza al general. Ejemplo: general 10 por segundo, endpoint A 20, endpoint B 5.
+- **Todos los límites en una tabla**, en un solo archivo del Gateway: la política general y las reglas propias por método y ruta. Un único middleware, antes de las rutas, elige la política. Un test verifica que cada regla propia coincida con una ruta que existe.
+- **Contadores por endpoint:** cada endpoint lleva su propia cuenta; los requests a un endpoint no gastan el cupo de otro.
+- **Por IP** (`client_ip` del contexto). El diseño tiene que permitir otras dos dimensiones, a decidir al implementar:
+  - un límite global por endpoint (todos los clientes sumados), para proteger a las capas de abajo. Riesgo: un solo cliente puede agotarlo y dejar afuera al resto, así que tendría que ser bastante más alto que el límite por IP;
+  - un límite por usuario, recién cuando exista la sesión (tanda 8), porque antes no hay un `user_id` confiable.
+- **Si Valkey no responde, el request pasa** y se registra un error: una caída de Valkey no puede tirar toda la API.
+- **Hecho a mano**, sin librería: ventana fija con un contador en Valkey. El incremento y el vencimiento de la clave se hacen en una sola operación atómica (script Lua con `INCR` + `EXPIRE`), y la clave incluye el número de ventana, así un contador nunca queda sin vencimiento ni bloquea a alguien para siempre.
+- **Respuesta:** 429 con el código `TOO_MANY_REQUESTS` y el header `Retry-After`.
+- `/isAlive` queda exento (lo consulta el balanceador). El límite general se puede cambiar por variable de entorno; las reglas propias van en el código.
+
+### Aviso de request lento (definido el 2026-11-15, entra con la tanda 7)
+
+- Cuando un request tarda más de un umbral, su línea de log sale como `warn` en vez de `info`. Sirve para saber si un error que vio el usuario en la App se debió a que el backend tardó en resolver.
+- **El umbral va atado al tiempo que espera la App:** una constante compartida en `Packages/types` (se crea en la tanda 7), que la App usa para cortar el `fetch` y el Gateway para decidir el aviso. Hoy la App no tiene un tiempo máximo de espera: se agrega en ese momento.
+- Lo mismo en la línea de cierre de cada salto gRPC (Business y DataAccess), para ver cuál capa fue la lenta.
+

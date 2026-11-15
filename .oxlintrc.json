@@ -4,7 +4,10 @@
     "typescript",
     "unicorn",
     "import",
-    "jest"
+    "jest",
+    "vitest",
+    "react",
+    "jsx-a11y"
   ],
   "categories": {
     "correctness": "error",
@@ -20,9 +23,13 @@
       "warn",
       {
         "allow": [
-          "reflect-metadata"
+          "reflect-metadata",
+          "**/*.css",
+          "@testing-library/jest-dom/vitest",
+          "**/i18n/i18n"
         ]
       }
-    ]
+    ],
+    "react/react-in-jsx-scope": "off"
   }
 }

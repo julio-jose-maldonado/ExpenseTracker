@@ -135,3 +135,32 @@ Revisiones: code-review, Codex, semgrep `p/default` y revisión de seguridad man
 - `callUnary` debería reconstruir el `AppError` desde el `details` del status gRPC. Hoy cada caller envuelve cualquier falla como `SERVICE_UNAVAILABLE`, y un `NOT_FOUND` de abajo llegaría al usuario como 503. Con eso desaparece el try/catch duplicado de los health checks de Gateway y Business.
 - Propagar el deadline entrante en vez de poner 3 s nuevos en cada salto.
 - Log de requests: con routers montados bajo un prefijo, `req.baseUrl` ya volvió al del padre cuando se escribe la línea.
+
+## 2026-11-14 · Esqueleto de la App (tanda 4)
+
+- **Stack:** Vite 8 + React 19 + TypeScript 7, Tailwind 4 (`@tailwindcss/vite`), shadcn/ui (estilo new-york, base neutral, modo claro/oscuro por `prefers-color-scheme`), TanStack Query 5, i18next + react-i18next. React Hook Form y Zustand siguen esperando a la historia #1.
+- **tsconfig propio** (no extiende el base): `moduleResolution: bundler`, `jsx: react-jsx`, `noUncheckedIndexedAccess`. El alias `@/` va solo con `paths` (TS 7 no tiene `baseUrl`).
+- **Llamadas al backend por `/api` en el mismo origen.** En local, el proxy de Vite reenvía `/api/*` al Gateway sin el prefijo (`GATEWAY_URL`, default `http://localhost:3000`). En AWS lo va a hacer CloudFront (behavior `/api/*` → ALB). **Por qué:** sin CORS, y la cookie de sesión `httpOnly` funciona con `SameSite=Strict` sin configuración extra.
+- **Cliente HTTP** (`src/api/apiClient.ts`): desarma `{ data }` / `{ error: { code, message } }` en un `ApiError` con `status`, `code` y el mensaje ya traducido. Si el servidor no responde o no devuelve JSON, el código es `NETWORK` y la App muestra un texto propio. Las formas del sobre pasan a `@expense-tracker/types` con la historia #1.
+- **i18n:** instancia propia (`createInstance`), español por defecto y textos en inglés tipados contra los de español: si falta o sobra una clave, no compila. Las claves de `t()` también están tipadas.
+- **Tests del front con Vitest** + Testing Library + jsdom, no Jest: Vitest usa la misma configuración y el mismo pipeline de Vite, sin otro transformador. El backend sigue con Jest + SWC.
+- **Versiones y `minimumReleaseAge`:** toda la mayor 27 de `i18next` tenía menos de 7 días, así que la App usa 26.7.2 (el Gateway quedó en 27.0.1, instalado antes de la regla). Por la misma razón, `react-i18next` 17.1.13 en vez de la 18. pnpm no busca una versión anterior dentro del rango: si la última no cumple la antigüedad, falla, y hay que fijar una exacta.
+- **shadcn:** la CLI 4.23 no resolvió el alias `@/lib/utils` e instaló el paquete `cn` (del autor de shadcn, 0.x, de pocos días y sin repo publicado) como reemplazo de `clsx` + `tailwind-merge`. Se sacó: los componentes usan `@/lib/utils`. Se mantiene `radix-ui`, el paquete oficial que ahora usa shadcn en lugar de `@radix-ui/react-*`. Revisar el diff después de cada `shadcn add`.
+- **Lint:** oxlint suma los plugins `react`, `jsx-a11y` y `vitest`; `react-in-jsx-scope` apagada (no aplica con el JSX runtime nuevo).
+- **dependency-cruiser:** la App no puede importar de `Backend/` ni de `Packages/core|proto|testing` (solo va a poder usar `Packages/types`), y el backend no puede importar de la App. Verificado con un import prohibido. depcruise lee `tsconfig.depcruise.json` (el base más el alias `@/` de la App) para resolver esos imports, y la regla `not-to-unresolvable` falla si algún import no se resuelve, porque un import sin resolver se saltea las demás reglas sin avisar.
+
+## 2026-11-14 · Configuración y secretos en AWS (para la etapa de infra)
+
+**Decisión:** en AWS no hay archivos `.env`.
+- **Secretos** (contraseñas de Postgres) en **Secrets Manager**. RDS genera y guarda la contraseña maestra ahí (con rotación); CDK genera como secretos las de `expense_migrator` y `expense_app`.
+- **Configuración no secreta** (puertos, direcciones entre servicios) como variables del task definition de ECS, o en **SSM Parameter Store** (nivel estándar, gratis) si hace falta cambiarla sin redesplegar.
+- ECS inyecta los secretos como variables de entorno al arrancar cada contenedor: **el código no cambia**, sigue leyendo `process.env` con `readRequiredEnv`.
+- Cada servicio tiene su propio rol de IAM, que solo puede leer sus secretos: el Gateway no ve la contraseña de la base.
+
+**Por qué:** los secretos no viven en ningún archivo ni en el repo, el acceso queda auditado y limitado por servicio, y existe la rotación.
+**A tener en cuenta:** Secrets Manager cuesta USD 0,40 por secreto por mes, prorrateado (centavos destruyendo el stack después de cada sesión). Como los secretos se leen al arrancar, rotar una contraseña requiere reiniciar las tareas de ECS para que la tomen.
+**En local:** se sigue con `.env` (`.env.example` versionado, solo con los nombres). Usar Secrets Manager desde la laptop implicaría credenciales de AWS locales y depender de la red para desarrollar, sin nada que proteger.
+
+**Tráfico interno (pendiente para la etapa de infra, surgió de la revisión de seguridad del bootstrap):**
+- **TLS hacia Postgres:** hoy la conexión va sin TLS (`ssl: false` en `drizzle.config.ts` y el pool de `CreateDatabase.ts` sin `ssl`), que en local da igual. En RDS hay que activarlo verificando el certificado (`ssl: { ca: <bundle de CA de RDS>, rejectUnauthorized: true }`), tanto en el pool como en drizzle-kit, y forzarlo del lado de RDS con `rds.force_ssl = 1` en el parameter group. Sin verificar el certificado, el TLS no protege de alguien que se haga pasar por la base.
+- **gRPC sin TLS entre servicios:** es a propósito (credenciales `insecure`), y en AWS se sostiene porque Business y DataAccess quedan en subredes privadas, sin IP pública, y sus security groups solo aceptan el puerto gRPC desde el servicio que los llama (DataAccess solo desde Business, Business solo desde el Gateway). Si algún día eso deja de alcanzar, el paso siguiente es TLS en gRPC (o mTLS con certificados por servicio).

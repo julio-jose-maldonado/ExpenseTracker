@@ -8,10 +8,10 @@
   },
   "scripts": {
     "build": "pnpm -r build",
-    "typecheck": "pnpm -r build && pnpm -r typecheck",
-    "test": "pnpm -r build && pnpm -r test",
+    "typecheck": "pnpm -r --filter '!@expense-tracker/app' build && pnpm -r typecheck",
+    "test": "pnpm -r --filter '!@expense-tracker/app' build && pnpm -r test",
     "lint": "oxlint",
-    "depcruise": "depcruise Backend Packages --config .dependency-cruiser.cjs"
+    "depcruise": "depcruise App/src Backend Packages --config .dependency-cruiser.cjs"
   },
   "devDependencies": {
     "@swc/core": "1.16.22",

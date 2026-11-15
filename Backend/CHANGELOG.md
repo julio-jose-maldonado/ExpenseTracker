@@ -7,6 +7,24 @@ El contrato HTTP para el frontend tiene su propio changelog en [`docs/API_Fronte
 
 ## Historial
 
+### 2026-11-15 · d189c64
+
+#### feat(app): add web app skeleton with end-to-end health check
+
+- `App/` nuevo (no es backend, pero comparte la raíz): Vite + React con la tarjeta que consulta `/isAliveChain` por `/api`. Detalle en `docs/Decisiones_Tecnicas.md`.
+- Raíz: `typecheck` y `test` construyen todo menos la App (no necesitan su bundle); `pnpm build` y el CI la siguen construyendo.
+- dependency-cruiser: recorre también `App/src`, reglas App ↔ Backend, `tsconfig.depcruise.json` para el alias `@/` y regla `not-to-unresolvable`.
+- oxlint: plugins `react`, `jsx-a11y` y `vitest`.
+- Sin cambios de código ni de dependencias en `Backend/` ni en `Packages/`.
+- **Dependencias (App, nuevas):**
+  - `react` · `react-dom`: — → 19.3.1
+  - `@tanstack/react-query`: — → 5.107.1
+  - `i18next`: — → 26.7.2 (la mayor 27 todavía no cumple los 7 días de `minimumReleaseAge`; el Gateway sigue en 27.0.1)
+  - `react-i18next`: — → 17.1.13
+  - `radix-ui`: — → 1.8.1 · `lucide-react`: — → 1.70.0
+  - `class-variance-authority`: — → 0.7.1 · `clsx`: — → 2.1.1 · `tailwind-merge`: — → 3.7.0
+  - dev: `vite` 8.3.6, `@vitejs/plugin-react` 6.2.1, `tailwindcss` · `@tailwindcss/vite` 4.3.5, `tw-animate-css` 1.4.0, `@types/react` · `@types/react-dom` 19.3.0, `vitest` 5.1.0, `jsdom` 31.0.0, `@testing-library/react` 16.3.3, `@testing-library/jest-dom` 7.0.1, `@testing-library/user-event` 14.6.8
+
 ### 2026-11-14 · d885c89
 
 #### chore: bootstrap the three-layer backend with gRPC, PostgreSQL and CI

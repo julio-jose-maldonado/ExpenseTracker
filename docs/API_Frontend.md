@@ -7,6 +7,10 @@ Las capas internas (Business, DataAccess) no se exponen: el frontend solo habla 
 
 La entrada más nueva arriba, con el SHA completo y la fecha del commit que cambió el contrato.
 
+### 2026-11-15 · d189c64a2e37c100cbdfe1fa945a7f46b66e0a17
+
+- La App llama al Gateway por `/api` en su mismo origen (proxy de Vite en local, CloudFront en AWS). Las rutas del Gateway no cambian: el prefijo se saca antes de llegar.
+
 ### 2026-11-14 · d885c8936b77ab6586c0a8dda2e6dfdffb1ae85c
 
 - Contrato inicial: formato de respuesta, códigos de error, `x-request-id`, `GET /isAlive` y `GET /isAliveChain`.
@@ -17,7 +21,8 @@ La entrada más nueva arriba, con el SHA completo y la fecha del commit que camb
 
 | Tema | Valor |
 |---|---|
-| Base URL local | `http://localhost:3000` (puerto: `PORT` en `Backend/Gateway/.env`) |
+| Base URL desde la App | `/api` en el mismo origen: `fetch('/api/isAliveChain')`. Vite (local) y CloudFront (AWS) reenvían al Gateway sin el prefijo |
+| Gateway directo (local) | `http://localhost:3000` (puerto: `PORT` en `Backend/Gateway/.env`), para probar con curl. Las rutas de abajo son las del Gateway, sin `/api` |
 | Formato | JSON (`Content-Type: application/json`), body de hasta **50 kb** |
 | Autenticación | Todavía no hay. Llega con las historias #1 y #2: sesión en cookie `httpOnly` manejada por el Gateway (el frontend no guarda tokens) |
 | Idioma de los mensajes | Español por ahora. Con la historia #10, el idioma del usuario |

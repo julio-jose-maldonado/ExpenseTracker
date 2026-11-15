@@ -50,14 +50,19 @@ pnpm --filter @expense-tracker/data-access db:migrate   # cuando haya migracione
 pnpm --filter @expense-tracker/data-access start
 pnpm --filter @expense-tracker/business start
 pnpm --filter @expense-tracker/gateway start
+
+# la App (otra terminal): http://localhost:5173
+pnpm --filter @expense-tracker/app dev
 ```
+
+La App llama a `/api/...` y Vite lo reenvía al Gateway sin el prefijo. Si el Gateway no está en `http://localhost:3000`, se cambia con la variable `GATEWAY_URL` al levantar Vite.
 
 ## 3. Probar
 
 ```sh
 curl localhost:3000/isAlive        # solo el Gateway
 curl localhost:3000/isAliveChain   # Gateway → Business → DataAccess → Postgres
-pnpm test                          # unitarios, sin Docker
+pnpm test                          # unitarios del backend (Jest) y de la App (Vitest), sin Docker
 pnpm --filter @expense-tracker/data-access test:integration   # contra el Postgres del compose
 ```
 

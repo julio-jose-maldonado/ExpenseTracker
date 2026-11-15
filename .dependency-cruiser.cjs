@@ -5,6 +5,13 @@ const LAYER = (n) => String.raw`^Backend/[^/]+/src/Domains/[^/]+/${n}\.`;
 module.exports = {
   forbidden: [
     {
+      name: 'not-to-unresolvable',
+      comment: 'Un import que no se resuelve se saltea las demás reglas sin avisar (pasó con el alias @/ de la App).',
+      severity: 'error',
+      from: {},
+      to: { couldNotResolve: true },
+    },
+    {
       name: 'no-circular',
       severity: 'error',
       from: {},
@@ -50,6 +57,19 @@ module.exports = {
       to: { path: [LAYER(2), LAYER(3), LAYER(4)] },
     },
     {
+      name: 'app-does-not-import-backend',
+      comment: 'La App solo habla con el Gateway por HTTP; de Packages/ solo puede usar types (contrato HTTP).',
+      severity: 'error',
+      from: { path: '^App/' },
+      to: { path: '^(Backend/|Packages/(core|proto|testing)/)' },
+    },
+    {
+      name: 'backend-does-not-import-app',
+      severity: 'error',
+      from: { path: '^(Backend|Packages)/' },
+      to: { path: '^App/' },
+    },
+    {
       name: 'only-data-access-touches-the-database',
       severity: 'error',
       from: { path: '^(Backend/(Gateway|Business)|Packages)/' },
@@ -60,7 +80,7 @@ module.exports = {
     parser: 'swc',
     doNotFollow: { path: 'node_modules' },
     exclude: { path: '(/dist/|/generated/|/test/)' },
-    tsConfig: { fileName: 'tsconfig.base.json' },
+    tsConfig: { fileName: 'tsconfig.depcruise.json' },
     combinedDependencies: true,
   },
 };

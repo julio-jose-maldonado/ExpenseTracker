@@ -164,3 +164,26 @@ Revisiones: code-review, Codex, semgrep `p/default` y revisión de seguridad man
 **Tráfico interno (pendiente para la etapa de infra, surgió de la revisión de seguridad del bootstrap):**
 - **TLS hacia Postgres:** hoy la conexión va sin TLS (`ssl: false` en `drizzle.config.ts` y el pool de `CreateDatabase.ts` sin `ssl`), que en local da igual. En RDS hay que activarlo verificando el certificado (`ssl: { ca: <bundle de CA de RDS>, rejectUnauthorized: true }`), tanto en el pool como en drizzle-kit, y forzarlo del lado de RDS con `rds.force_ssl = 1` en el parameter group. Sin verificar el certificado, el TLS no protege de alguien que se haga pasar por la base.
 - **gRPC sin TLS entre servicios:** es a propósito (credenciales `insecure`), y en AWS se sostiene porque Business y DataAccess quedan en subredes privadas, sin IP pública, y sus security groups solo aceptan el puerto gRPC desde el servicio que los llama (DataAccess solo desde Business, Business solo desde el Gateway). Si algún día eso deja de alcanzar, el paso siguiente es TLS en gRPC (o mTLS con certificados por servicio).
+
+## 2026-11-15 · Capas 4 y 5 como puertos y adaptadores, y dependencias de los services por parámetro
+
+**Capas 4 y 5:**
+- `5.ExternalServices`: una sola llamada cruda hacia afuera (gRPC, SQL, Redis, SES), sin decisiones. Maneja los tipos de afuera (mensajes de ts-proto, filas de Drizzle).
+- `4.Repositories`: el adaptador. Implementa una interfaz (el contrato que usan los services), traduce entre los tipos de afuera y los del dominio, y combina fuentes cuando hace falta (en DataAccess, cache en Redis + Postgres).
+- **Regla:** la interfaz de un repositorio solo usa tipos del dominio, nunca tipos de afuera.
+
+**Por qué:** cambiar un servicio externo tiene que tocar solo la capa 5 y la implementación del adaptador. Si la interfaz devolviera un mensaje proto o una fila de Drizzle, el cambio obligaría a tocar la interfaz y los services. La traducción es además el trabajo propio de la capa 4: sin ella sería un pasamanos de la 5.
+
+**Dependencias de los services:** los services siguen siendo funciones. Reciben sus dependencias en el último parámetro, siempre como un objeto desestructurado en el que cada dependencia tiene el contenedor de tsyringe como valor por defecto:
+
+```ts
+export async function checkChainHealth({
+  businessHealth = container.resolve<ICheckBusinessHealth>(ICheckBusinessHealth),
+}: { businessHealth?: ICheckBusinessHealth } = {}): Promise<void> {
+```
+
+Los datos de entrada van antes: `createExpense(input, { saveExpense = ..., findCategory = ... } = {})`. En Business y DataAccess el primer parámetro es siempre el request gRPC, que es lo que pasa `handleUnary`, aunque venga vacío (`_request`).
+**Por qué:** la firma muestra de qué depende el service, y un test unitario le pasa un doble a mano (`checkChainHealth({ businessHealth: fake })`), sin registrar nada en el contenedor ni levantar un servidor gRPC falso. Los controllers no cambian.
+**Por qué un objeto con un default por propiedad, y no un parámetro por dependencia ni un objeto con un default entero:** un test puede reemplazar una sola dependencia y las demás siguen saliendo del contenedor; cada una se resuelve solo si no vino. Además, si por error el service recibe otra cosa en ese lugar (el request, por pasarlo directo como callback), las propiedades no existen y se usan los defaults, en vez de tomar ese objeto como dependencia.
+**Descartado:** services como clases `@injectable()` con inyección por constructor (se prefiere mantenerlos como funciones); `container.resolve` dentro del cuerpo (dependencia escondida, tests atados al contenedor global).
+

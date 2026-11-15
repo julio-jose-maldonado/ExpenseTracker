@@ -7,6 +7,16 @@ El contrato HTTP para el frontend tiene su propio changelog en [`docs/API_Fronte
 
 ## Historial
 
+### 2026-11-15 · 43c3cc1
+
+#### refactor(backend): pass service dependencies as a defaulted last parameter
+
+- Services de Health en Gateway, Business y DataAccess: la dependencia pasa del cuerpo (`container.resolve` adentro) al último parámetro, un objeto desestructurado con `container.resolve(...)` como default de cada propiedad. Los controllers no cambian.
+- Business y DataAccess: `checkHealth` recibe el request gRPC como primer parámetro (`_request`), que es lo que le pasa `handleUnary`.
+- Tests unitarios de los tres services (`Gateway/test/CheckChainHealth.test.ts`, `Business/test/CheckHealth.test.ts`, `DataAccess/test/CheckHealth.test.ts`), que pasan la dependencia a mano. El del Gateway cubre el caso "Business responde que no está ok".
+- Convención y regla de las capas 4 y 5 (puertos y adaptadores) en `docs/Decisiones_Tecnicas.md` y `CLAUDE.md`.
+- Sin cambios de dependencias.
+
 ### 2026-11-15 · d189c64
 
 #### feat(app): add web app skeleton with end-to-end health check

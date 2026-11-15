@@ -32,7 +32,7 @@ Adds the web app skeleton (`App/`): Vite + React 19 with Tailwind 4, shadcn/ui, 
 - Root `typecheck` and `test` no longer build the app bundle; `pnpm build` (and CI) still do.
 
 ### docs
-- `docs/Decisiones_Tecnicas.md`: web app skeleton decisions, and a new entry on configuration and secrets on AWS (Secrets Manager, task definitions / SSM Parameter Store, one IAM role per service).
+- `docs/Decisiones_Tecnicas.md`: web app skeleton decisions, and a new entry on configuration and secrets on AWS (Secrets Manager, task definitions / SSM Parameter Store, one IAM role per service, and pending internal-traffic items from the bootstrap security review: verified TLS to RDS, private subnets and security groups for plaintext gRPC).
 - `docs/Desarrollo_Local.md`, `README.md`, `CLAUDE.md`: how to run the app.
 - `docs/API_Frontend.md`: the app calls the Gateway through `/api`.
 - `Backend/CHANGELOG.md` and this file.

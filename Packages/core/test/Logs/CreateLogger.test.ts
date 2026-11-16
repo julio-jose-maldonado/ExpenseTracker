@@ -1,5 +1,5 @@
 import { Writable } from 'node:stream';
-import { runWithRequestId } from '../../src/Context/RunWithRequestId';
+import { runWithRequestContext } from '../../src/Context/RunWithRequestContext';
 import { createLogger } from '../../src/Logs/CreateLogger';
 
 function captureLines() {
@@ -18,7 +18,7 @@ describe('createLogger', () => {
     const { lines, stream } = captureLines();
     const logger = createLogger('gateway', stream);
 
-    runWithRequestId('req-abc', () => logger.info('hola'));
+    runWithRequestContext({ requestId: 'req-abc' }, () => logger.info('hola'));
 
     const entry = JSON.parse(lines[0]);
     expect(entry).toMatchObject({

@@ -7,6 +7,10 @@ Las capas internas (Business, DataAccess) no se exponen: el frontend solo habla 
 
 La entrada más nueva arriba, con el SHA completo y la fecha del commit que cambió el contrato.
 
+### 2026-11-15 · 0098175344aef23f615b1836642e0a88a5525b46
+
+- `GET /isAliveChain`: responde 500 `INTERNAL` si una capa interna falla por un error inesperado (antes era siempre 503). El 503 `SERVICE_UNAVAILABLE` queda para cuando una capa o la base no responde. El corte pasa a ser de 3 s en total, no por salto.
+
 ### 2026-11-15 · d189c64a2e37c100cbdfe1fa945a7f46b66e0a17
 
 - La App llama al Gateway por `/api` en su mismo origen (proxy de Vite en local, CloudFront en AWS). Las rutas del Gateway no cambian: el prefijo se saca antes de llegar.
@@ -90,4 +94,5 @@ Chequea la cadena completa: Gateway → Business → DataAccess → PostgreSQL.
 
 | HTTP | `code` | Cuándo |
 |---|---|---|
-| 503 | `SERVICE_UNAVAILABLE` | Alguna capa interna o la base no responde (corte a los 3 s por salto) |
+| 503 | `SERVICE_UNAVAILABLE` | Alguna capa interna o la base no responde (corte a los 3 s en total) |
+| 500 | `INTERNAL` | Alguna capa interna falló por un error inesperado |

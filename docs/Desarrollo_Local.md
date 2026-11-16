@@ -37,7 +37,7 @@ Los `.env.example` vienen vacíos: los valores se completan con las tablas de ab
 
 **`Backend/Business/.env`**: `GRPC_PORT=50051` · `DATA_ACCESS_GRPC_ADDRESS=localhost:50052`
 
-**`Backend/Gateway/.env`**: `PORT=3000` · `BUSINESS_GRPC_ADDRESS=localhost:50051`
+**`Backend/Gateway/.env`**: `PORT=3000` · `BUSINESS_GRPC_ADDRESS=localhost:50051` · `TRUSTED_PROXY_HOPS` vacío (opcional: cuántos proxies propios hay delante del Gateway; en local, ninguno)
 
 ## 2. Levantar
 

@@ -1,9 +1,9 @@
 import { getRequestId } from '../../src/Context/GetRequestId';
-import { runWithRequestId } from '../../src/Context/RunWithRequestId';
+import { runWithRequestContext } from '../../src/Context/RunWithRequestContext';
 
 describe('RequestContext', () => {
   it('devuelve el requestId dentro del contexto, incluso después de un await', async () => {
-    await runWithRequestId('req-123', async () => {
+    await runWithRequestContext({ requestId: 'req-123' }, async () => {
       await Promise.resolve();
       expect(getRequestId()).toBe('req-123');
     });

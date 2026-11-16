@@ -13,7 +13,10 @@ export class App {
   readonly server: Express = express();
   readonly #i18n: i18n = createI18n();
 
-  constructor(private readonly logger: Logger) {
+  constructor(
+    private readonly logger: Logger,
+    private readonly options: { trustedProxyHops: number } = { trustedProxyHops: 0 },
+  ) {
     this.#settings();
     this.#middleware();
     this.#routes();
@@ -21,6 +24,9 @@ export class App {
 
   #settings(): void {
     this.server.disable('x-powered-by');
+    // Cuántos proxies propios hay delante (en AWS: CloudFront y el ALB). Express toma la IP del cliente
+    // de X-Forwarded-For salteando esa cantidad desde la derecha. Con 0 ignora el header, que cualquiera puede inventar.
+    this.server.set('trust proxy', this.options.trustedProxyHops);
   }
 
   #middleware(): void {

@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@grpc/grpc-js": "1.14.7",
+    "i18next": "27.0.1",
     "pino": "10.4.0"
   }
 }

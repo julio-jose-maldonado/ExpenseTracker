@@ -12,4 +12,8 @@ export { handleUnary } from './Grpc/HandleUnary';
 export { REQUEST_ID_METADATA_KEY } from './Grpc/RequestIdMetadataKey';
 export { startGrpcServer } from './Grpc/StartGrpcServer';
 export { createLogger } from './Logs/CreateLogger';
+export { createTranslator, type Translate } from './Translations/CreateTranslator';
+export { es } from './Translations/es/translation';
+export { TranslationKeys } from './Translations/TranslationKeys';
+export type { Translations } from './Translations/Translations';
 export type { Logger } from 'pino';

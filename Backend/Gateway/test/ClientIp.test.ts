@@ -76,12 +76,13 @@ describe('Gateway: IP del cliente en los logs', () => {
 });
 
 describe('Gateway: TRUSTED_PROXY_HOPS', () => {
-  const NAMES = ['PORT', 'BUSINESS_GRPC_ADDRESS', 'TRUSTED_PROXY_HOPS'] as const;
+  const NAMES = ['PORT', 'BUSINESS_GRPC_ADDRESS', 'VALKEY_URL', 'TRUSTED_PROXY_HOPS'] as const;
   const original = NAMES.map((name) => [name, process.env[name]] as const);
 
   beforeEach(() => {
     process.env.PORT = '3000';
     process.env.BUSINESS_GRPC_ADDRESS = 'localhost:50051';
+    process.env.VALKEY_URL = 'redis://localhost:6380';
     delete process.env.TRUSTED_PROXY_HOPS;
   });
 

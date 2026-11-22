@@ -7,6 +7,30 @@ El contrato HTTP para el frontend tiene su propio changelog en [`docs/API_Fronte
 
 ## Historial
 
+### 2026-11-15 · (SHA al commitear)
+
+#### feat(gateway): add Valkey-backed rate limit and move translations to core
+
+- Gateway · `createRateLimit`: middleware único, antes de leer el body. Ventana fija por IP y por endpoint; pasado el límite responde 429 `TOO_MANY_REQUESTS` con `Retry-After`. Las rutas que no existen comparten una cuenta. Si el contador falla, el request pasa y se registra un error (a lo sumo uno cada 30 s).
+- Gateway · `Shared/RateLimit/RateLimits.ts`: tabla con el límite general (10 por segundo), reglas propias por endpoint y exentos (`GET /isAlive`). La App no arranca si una regla apunta a una ruta que no existe.
+- Gateway · `listEndpoints` / `findEndpointId`: listan las rutas registradas y resuelven a cuál va un request antes del ruteo, con los matchers de Express. Los routers se montan sin prefijo.
+- Gateway · `rateLimitSubjectFromIp`: IPv4 por dirección (también escrita como IPv6), IPv6 por bloque /64.
+- Gateway · `errorCodeFromError`: un parámetro de ruta mal codificado (`URIError` con status 400 del router) sale como 400 `MALFORMED_REQUEST` en vez de 500.
+- Gateway · `IRateLimitStore` con dos implementaciones: `ValkeyRateLimitStore` (script Lua registrado como comando, `INCR` + `EXPIRE` atómico) e `InMemoryRateLimitStore` (por defecto, para tests).
+- Gateway · `createValkeyClient`: cliente `iovalkey` que falla rápido sin conexión (sin cola, 250 ms por comando) y registra los errores de conexión sin tirar el proceso.
+- Gateway · variables: `VALKEY_URL` (obligatoria, `redis://` o `rediss://` con host) y `RATE_LIMIT_GENERAL_MAX` (opcional). `App` recibe `rateLimit` en sus opciones; `trustedProxyHops` pasa a ser opcional.
+- `core` · traducciones: los textos en español, sus claves y el traductor pasan del Gateway a `core` (`Translations`, `es`, `TranslationKeys`, `createTranslator`). Una clave sin texto devuelve el mensaje genérico y deja un `warn`. El Gateway crea el traductor en `App` y pide los mensajes con `TranslationKeys.errors[code]`. Se borra `Gateway/src/Localization`.
+- `core` · `ErrorCode.TOO_MANY_REQUESTS` (gRPC `RESOURCE_EXHAUSTED`); no cruza entre capas, igual que los otros códigos del request HTTP.
+- dependency-cruiser: regla nueva `only-gateway-and-data-access-touch-valkey`; la de la base ya no incluye los clientes de Redis.
+- CI: el job de integración levanta Valkey y corre `test:integration` del Gateway (script y config de Jest nuevos).
+- Tests nuevos: en el Gateway, `RateLimit` (21), `Endpoints` (13), `RateLimitSubject` (7), `InMemoryRateLimitStore` (3), `EnvConfigs` (17), `ErrorCodeFromError` (2), `ValkeyClient` (3) e `Integration/ValkeyRateLimitStore` (4); en `core`, `Grpc/TooManyRequests` (3) `Translations/Translations` (13) y `Translations/CreateTranslator` (4). En `ClientIp` (existente) se agregó `VALKEY_URL` al entorno del test.
+
+**Dependencias**
+
+- Gateway · `iovalkey`: — → 0.4.0
+- Gateway · `i18next`: 27.0.1 → —
+- `core` · `i18next`: — → 27.0.1
+
 ### 2026-11-15 · 0098175
 
 #### feat(core): rebuild AppError across gRPC hops and propagate the deadline

@@ -10,6 +10,7 @@ const GRPC_STATUS_BY_ERROR_CODE: Record<ErrorCode, status> = {
   SERVICE_UNAVAILABLE: status.UNAVAILABLE,
   MALFORMED_REQUEST: status.INVALID_ARGUMENT,
   PAYLOAD_TOO_LARGE: status.RESOURCE_EXHAUSTED,
+  TOO_MANY_REQUESTS: status.RESOURCE_EXHAUSTED,
 };
 
 export function grpcStatusFromError(error: unknown): status {

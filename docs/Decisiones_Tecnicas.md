@@ -220,3 +220,54 @@ Cierra los tres pendientes anotados el 2026-11-14.
 
 **Forma de trabajo:** desde esta tanda se trabaja con TDD: primero los tests, se los ve fallar por el motivo esperado, y después la implementación.
 
+
+## 2026-11-15 · Rate limit en el Gateway (tanda 6)
+
+El diseño general está en `docs/backlog.md` (tanda 6). Acá va lo que se decidió al implementar.
+
+- **Tabla única:** `Backend/Gateway/src/Shared/RateLimit/RateLimits.ts` tiene el límite general (10 requests por segundo), las reglas propias por endpoint (`overrides`, con la clave `MÉTODO ruta` tal como se registró en el controller) y los endpoints exentos. `RATE_LIMIT_GENERAL_MAX` (opcional, entero entre 1 y 1.000.000) reemplaza el máximo general sin tocar el código.
+- **Solo por IP por ahora.** Cada política es un objeto con una propiedad por dimensión (`{ perIp: { max, windowSeconds } }`): el límite por usuario (con la sesión) y el global por endpoint se agregan como propiedades nuevas, sin reescribir las reglas que ya existan. No se implementaron ahora porque ningún endpoint los necesita todavía.
+- **A qué endpoint va un request:** el middleware corre antes del ruteo, así que Express todavía no dijo qué ruta atiende el request. La App recorre las rutas registradas al construirse (`listEndpoints`) y el middleware busca la que coincide usando los mismos matchers de Express, así `/expenses/1` y `/expenses/2` cuentan como `GET /expenses/:id` y la coincidencia es idéntica a la del ruteo (mayúsculas, barra final, `HEAD` atendido por la ruta `GET`). Si dos rutas se superponen, gana la primera registrada, igual que en Express.
+  - **Costo:** usa la estructura interna del router de Express 5 (`stack`, `route`, `matchers`, `slash`), que no es API documentada. Express está fijado a una versión exacta y `Endpoints.test.ts` falla si un upgrade cambia esa forma.
+  - **Regla que sale de acá:** los routers se montan sin prefijo (`use(router)`), con la ruta completa en cada controller. Express no guarda el prefijo de un router montado, y sin él no se puede armar la ruta completa: la App no arranca si encuentra uno.
+  - **Descartado:** aplicar el límite ruta por ruta en cada controller (fácil olvidarse en una ruta nueva) y contar por el path pedido (cada id sería un contador distinto, y un cliente podría crear contadores sin límite).
+- **Rutas que no existen:** comparten una sola cuenta por IP (`unmatched`). Limita a quien escanea rutas y evita un contador por cada path inventado. Ahí caen también los `OPTIONS`: hoy no hay CORS (la App llama por el mismo origen); si se agrega, los preflights necesitan su propia regla.
+- **Parámetro de ruta mal codificado** (`/expenses/%zz`): el matcher de Express lanza un error. El rate limit lo toma como coincidencia con esa ruta, así el request se cuenta en ella; si el error se propagara, esos requests saldrían sin contarse. Después Express corta el request, y ahora sale como 400 `MALFORMED_REQUEST` (antes habría sido un 500 con una línea de error en el log).
+- **Rutas registradas con `router.all`:** son un endpoint con el método `ALL` (`ALL /ruta`), que atiende cualquier método.
+- **La App no arranca si una regla o una exención apunta a una ruta que no existe:** una regla con la ruta mal escrita no se aplicaría nunca y nadie se enteraría. Es una validación al construir la App, más fuerte que el test que se había pensado: cubre también la tabla real en producción.
+- **IPv6 por bloque /64:** a un cliente con IPv6 se le asigna un bloque /64 entero. Contando por dirección, podría cambiarla en cada request y no llegar nunca al límite. Una IPv4 escrita como IPv6 (`::ffff:1.2.3.4`, o en hexadecimal) cuenta como la IPv4.
+- **Ventana fija:** la clave es `rate-limit:{cliente}:{endpoint}:{número de ventana}`. Cada ventana usa una clave nueva y la anterior vence sola. **Límite conocido:** un cliente puede hacer el máximo al final de una ventana y otra vez al principio de la siguiente (hasta el doble en un instante). Se acepta por simplicidad; una ventana deslizante lo evita si algún endpoint lo necesita. El número de ventana sale del reloj de cada instancia: con relojes desfasados, cerca del cambio de ventana dos instancias pueden contar en claves distintas. Con ventanas de segundos el efecto es chico; si importa, se toma la hora de Valkey dentro del script.
+- **Contador en Valkey** (`ValkeyRateLimitStore`): un script Lua hace `INCR` y, si la clave es nueva, `EXPIRE`, en un solo paso atómico. Está registrado como comando del cliente, que manda solo el hash del script (`EVALSHA`) y no el texto en cada request. Detrás de la interfaz `IRateLimitStore`.
+- **Contador en memoria** (`InMemoryRateLimitStore`): es el valor por defecto de la App cuando no se le pasa otro. Lo usan los tests unitarios, que así no necesitan Docker; y si alguien arma la App sin pasarle el contador, queda con un límite por proceso en vez de sin límite.
+- **Si Valkey no responde, el request pasa.** El cliente (`createValkeyClient`) está configurado para enterarse rápido: sin conexión un comando falla en el momento (no se encola) y con conexión tiene 250 ms para responder. El error se registra a lo sumo una vez cada 30 s, tanto el del rate limit como el de conexión: con Valkey caído fallan todos los requests y una línea por cada uno inundaría los logs. El Gateway arranca aunque Valkey esté caído. **Límite conocido:** no hay un corte automático. Si Valkey está conectado pero no contesta, cada request espera los 250 ms antes de pasar, hasta que la conexión se da por caída. Se acepta por ahora; un corte que saltee el contador por unos segundos después de varios fallos lo resuelve.
+- **Cliente:** `iovalkey`, el fork de `ioredis` que mantiene el proyecto Valkey, en JavaScript puro. **Descartado:** `@valkey/valkey-glide` (el cliente oficial nuevo, con un binario nativo en Rust que complica la imagen de Docker), `ioredis` y `redis` (son los clientes de Redis; funcionan con Valkey, pero su compatibilidad a futuro depende de otra empresa). Como el contador está detrás de una interfaz, cambiar de cliente toca dos archivos.
+- **`VALKEY_URL`** (obligatoria): `redis://` en local y `rediss://` (TLS) en AWS. Si no es una URL de ese tipo con host, el Gateway no arranca (sin host el cliente se conectaría a localhost sin avisar); el mensaje de error no muestra el valor, que puede traer una contraseña.
+- **Orden de los middlewares:** contexto, log del request, helmet, rate limit, lectura del body. Así un 429 queda en el log con su IP, sale con los headers de seguridad, y un request rechazado no llega a leerse.
+- **Respuesta:** 429 `TOO_MANY_REQUESTS` con `Retry-After` (los segundos que le quedan a la ventana). `TOO_MANY_REQUESTS` es un código que solo decide el Gateway: si lo devuelve una capa de abajo llega como `INTERNAL`, igual que `MALFORMED_REQUEST` y `PAYLOAD_TOO_LARGE`.
+- **dependency-cruiser:** la regla que prohibía los clientes de Redis fuera de DataAccess se separó en dos. La base la sigue tocando solo DataAccess; Valkey lo pueden usar el Gateway y DataAccess, y Business no.
+- **CI:** el job de integración levanta también Valkey y corre los tests de integración del Gateway.
+
+**Para la etapa de infra:**
+- ElastiCache Valkey con cifrado en tránsito: `VALKEY_URL` con `rediss://`. Si se elige la variante serverless (o cualquiera en modo cluster), el cliente tiene que ser el de cluster de `iovalkey` y no el simple: definirlo al elegir la variante. El script del contador usa una sola clave, así que funciona en los dos modos.
+- El security group de Valkey solo acepta conexiones desde el Gateway (y desde DataAccess cuando tenga su cache).
+- El rate limit por IP depende de que `client_ip` sea la IP real: vale todo lo anotado para `TRUSTED_PROXY_HOPS`.
+- Alarma en CloudWatch sobre el mensaje `rate limit store failed`: mientras aparece, la API está sin límite de requests.
+
+**Revisiones (code-review, seguridad, semgrep, Codex):** sin vulnerabilidades. De ahí salieron el orden de registro al resolver rutas superpuestas, el manejo del parámetro mal codificado, `router.all`, la IPv4 en hexadecimal, el host obligatorio en `VALKEY_URL`, `EVALSHA` y que la App resuelva la tabla de límites una sola vez. Para tener en cuenta cuando lleguen login y recuperación de contraseña: dejar pasar los requests si el contador falla es razonable para la API en general, pero en esos endpoints conviene rechazar o caer a un contador en memoria.
+
+## 2026-11-16 · Las traducciones viven en `core`
+
+**Regla:** todo texto que llega al usuario final pasa por la traducción, con su clave y su texto en `core`. Un mensaje que no llega al usuario (un error de arranque, el detalle interno de un `AppError`, un log) puede ir escrito directo en el código.
+
+**Decisión:** los textos de cada idioma y la traducción salen del Gateway y pasan a `Packages/core/src/Translations`:
+
+- `Translations.ts`: la forma de un archivo de idioma (hoy, un mensaje por cada `ErrorCode`).
+- `es/translation.ts`: los textos en español. Cada idioma nuevo es otro archivo con la misma forma.
+- `TranslationKeys.ts`: la misma forma, con la ruta de cada texto como valor. El código pide un texto con `TranslationKeys.errors.NOT_FOUND` en vez de armar la ruta a mano.
+
+- `CreateTranslator.ts`: `createTranslator(logger)` inicia i18next con esos archivos y devuelve una función `translate(clave, idioma)`. Si una clave no tiene texto, devuelve el mensaje genérico y deja un `warn` en el log, para que el usuario no reciba la clave cruda.
+
+El Gateway sigue siendo el único que traduce: crea el traductor al construir la App y arma el mensaje en el manejador de errores. Ya no depende de i18next.
+
+**Por qué:** los textos son un contrato compartido, igual que los códigos de error, que ya están en `core`. Con todo en un lugar, un código o un texto nuevo obliga por tipos a cargarlo en cada idioma y en las claves, y un test verifica que cada clave apunte a un texto que existe. Si otra capa necesita una clave (por ejemplo, para un mensaje de validación), la toma del mismo lugar.
+**A tener en cuenta:** i18next pasa a ser dependencia de `core` y deja de serlo del Gateway. La App no puede importar `core`; sus textos de interfaz son otros y van en la App.

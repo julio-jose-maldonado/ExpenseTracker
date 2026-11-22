@@ -86,12 +86,96 @@ describe('FallbackRateLimitStore', () => {
   });
 
   it('cuando el principal vuelve, cuenta ahí otra vez', async () => {
-    const { store, primary } = createStore();
+    let nowMs = NOW_MS;
+    const { store, primary } = createStore({ now: () => nowMs });
     await store.increment('a', 60);
     primary.state.down = true;
     await store.increment('a', 60);
+    await store.increment('a', 60);
     primary.state.down = false;
+    // Pasado el corte automático. En el respaldo 'a' ya va por 2: si contara ahí, daría 3.
+    nowMs += 5_000;
 
     expect(await store.increment('a', 60)).toBe(2);
+  });
+});
+
+// Principal que cuenta las llamadas y deja controlar cuándo responde cada una.
+function createControlledPrimary() {
+  const pending: Array<{ resolve: (count: number) => void; reject: (error: Error) => void }> = [];
+  const store: IRateLimitStore = {
+    increment: () => new Promise<number>((resolve, reject) => pending.push({ resolve, reject })),
+  };
+  return { store, pending };
+}
+
+describe('FallbackRateLimitStore: corte automático', () => {
+  function createBreakerStore() {
+    let nowMs = NOW_MS;
+    const { logger } = createLines();
+    const primary = createControlledPrimary();
+    const fallback = new InMemoryRateLimitStore(() => nowMs);
+    const store = new FallbackRateLimitStore({ primary: primary.store, fallback, logger, now: () => nowMs });
+    return { store, primary, advance: (ms: number) => (nowMs += ms) };
+  }
+
+  async function failFirstCall(store: FallbackRateLimitStore, primary: ReturnType<typeof createControlledPrimary>) {
+    const first = store.increment('a', 60);
+    primary.pending[0].reject(new Error('timeout'));
+    await first;
+  }
+
+  it('después de un fallo no consulta al principal durante 5 s', async () => {
+    const { store, primary, advance } = createBreakerStore();
+    await failFirstCall(store, primary);
+
+    advance(4_999);
+    await store.increment('a', 60);
+    await store.increment('a', 60);
+
+    expect(primary.pending).toHaveLength(1);
+  });
+
+  it('pasados los 5 s vuelve a probar y, si responde, deja de usar el respaldo', async () => {
+    const { store, primary, advance } = createBreakerStore();
+    await failFirstCall(store, primary);
+
+    advance(5_000);
+    const probe = store.increment('a', 60);
+    primary.pending[1].resolve(7);
+    expect(await probe).toBe(7);
+
+    const next = store.increment('a', 60);
+    expect(primary.pending).toHaveLength(3);
+    primary.pending[2].resolve(8);
+    expect(await next).toBe(8);
+  });
+
+  it('si la prueba falla, corta otros 5 s', async () => {
+    const { store, primary, advance } = createBreakerStore();
+    await failFirstCall(store, primary);
+
+    advance(5_000);
+    const probe = store.increment('a', 60);
+    primary.pending[1].reject(new Error('timeout'));
+    await probe;
+    advance(4_999);
+    await store.increment('a', 60);
+
+    expect(primary.pending).toHaveLength(2);
+  });
+
+  it('mientras la prueba espera respuesta, los demás requests cuentan en memoria sin esperar', async () => {
+    const { store, primary, advance } = createBreakerStore();
+    await failFirstCall(store, primary);
+
+    advance(5_000);
+    const probe = store.increment('a', 60);
+    const others = await Promise.all([store.increment('b', 60), store.increment('b', 60), store.increment('b', 60)]);
+
+    expect(others).toEqual([1, 2, 3]);
+    expect(primary.pending).toHaveLength(2);
+    primary.pending[1].resolve(1);
+    await probe;
   });
 });

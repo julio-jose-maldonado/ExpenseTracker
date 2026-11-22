@@ -11,7 +11,8 @@ export interface Endpoint {
 }
 
 // Lo que se usa de las capas internas del router de Express 5 (paquete `router`). No es API documentada:
-// Express está fijado a una versión exacta y Endpoints.test.ts avisa si un upgrade cambia esta forma.
+// Express y `router` están fijados a una versión exacta (`router` con un override en pnpm-workspace.yaml)
+// y Endpoints.test.ts avisa si un upgrade cambia esta forma.
 interface RouterLayer {
   // Presente en las capas que son una ruta (`router.get(...)`).
   route?: { path: unknown; methods: Record<string, boolean> };

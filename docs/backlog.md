@@ -70,6 +70,10 @@ La historia #1 se hace en varias tandas, cada una con su PR. Se trabaja con TDD.
 - Lo mismo en la línea de cierre de cada salto gRPC (Business y DataAccess), para ver cuál capa fue la lenta.
 
 
+### Apagado del Gateway con dos señales (anotado el 2026-11-22, sin fecha)
+
+En `Backend/Gateway/src/index.ts`, si llegan dos señales seguidas (SIGTERM de ECS y después SIGINT, o dos Ctrl+C), `shutdown` corre dos veces: el segundo `httpServer.close` responde en el acto con `ERR_SERVER_NOT_RUNNING`, la limpieza se repite y el proceso sale antes de terminar los requests en curso. Se arregla con una bandera `shuttingDown` o registrando las señales con `process.once`. Venía de antes del rate limit; lo encontró la `code-review` de la tanda 6.
+
 ### Controles de calidad automáticos (anotado el 2026-11-19, a aplicar pronto)
 
 Idea tomada de Uncle Bob, que no lee el código de sus agentes y en su lugar lo hace pasar por tests y métricas. Acá **no reemplaza la revisión**: la idea es que lo que llegue a revisión ya haya pasado todos los controles automáticos, para que la revisión se concentre en el diseño y en si la implementación es la que se quería. Conviene meterlo ahora, con poco código: los límites arrancan desde el inicio en vez de tener que arreglar deuda después.

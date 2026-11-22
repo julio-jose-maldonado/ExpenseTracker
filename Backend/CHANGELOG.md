@@ -9,6 +9,20 @@ El contrato HTTP para el frontend tiene su propio changelog en [`docs/API_Fronte
 
 ### 2026-11-22 · (SHA al commitear)
 
+#### fix(gateway): add a circuit breaker and an overflow counter to the rate limit fallback
+
+- Gateway · `FallbackRateLimitStore`: corte automático. Después de un fallo del principal, durante 5 s cuenta directo en memoria; vencido ese tiempo, un solo request prueba al principal mientras los demás siguen en memoria. Con Valkey colgado, la espera de 250 ms la paga un request por corte y no todos.
+- Gateway · `InMemoryRateLimitStore`: con el tope de claves lleno, las claves nuevas comparten un contador de desborde en vez de desplazar a la más vieja, que le reiniciaba el límite a quien ya lo había pasado.
+- Gateway · `Endpoints.ts`: el comentario dice que también `router` está fijado.
+- Raíz · `pnpm-workspace.yaml`: override `express>router: 2.2.0`, porque el rate limit lee la estructura interna de ese paquete y Express lo pide como `^2.2.0`.
+- Tests: en `FallbackRateLimitStore` (existente) se agregaron 4 del corte y se ajustó "cuando el principal vuelve", que con el corte pasaba por casualidad (ahora avanza el reloj 5 s). En `InMemoryRateLimitStore` (existente) se reemplazó el test del desplazamiento por 4 del contador de desborde.
+
+**Dependencias**
+
+- Raíz · `router` (transitiva de Express): `^2.2.0` (resolvía 2.2.0) → 2.2.0 fijada con override.
+
+### 2026-11-22 · (SHA al commitear)
+
 #### fix(gateway): count rate limits in memory when Valkey fails
 
 - Gateway · `FallbackRateLimitStore`: envuelve al contador de Valkey y, si falla, cuenta en un `InMemoryRateLimitStore` de la instancia en vez de dejar pasar el request sin contar. Registra la caída a lo sumo una vez cada 30 s (`rate limit store failed: counting in memory per instance`).

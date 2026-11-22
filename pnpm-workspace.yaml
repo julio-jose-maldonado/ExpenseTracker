@@ -11,6 +11,13 @@ allowBuilds:
   esbuild: false
   protobufjs: false
 
+# Versiones fijadas de dependencias transitivas.
+overrides:
+  # El rate limit del Gateway lee la estructura interna del router de Express 5 (Endpoints.ts), que
+  # vive en el paquete `router`. Express lo pide como ^2.2.0: sin fijarlo, regenerar el lockfile
+  # podría traer otra versión sin que cambie Express.
+  "express>router": "2.2.0"
+
 # Defensas contra ataques de cadena de suministro (señaladas por semgrep p/default).
 # No instalar versiones con menos de 7 días publicadas: un release comprometido suele detectarse antes.
 minimumReleaseAge: 10080

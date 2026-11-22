@@ -112,11 +112,11 @@ function createControlledPrimary() {
 describe('FallbackRateLimitStore: corte automático', () => {
   function createBreakerStore() {
     let nowMs = NOW_MS;
-    const { logger } = createLines();
+    const { logger, lines } = createLines();
     const primary = createControlledPrimary();
     const fallback = new InMemoryRateLimitStore(() => nowMs);
     const store = new FallbackRateLimitStore({ primary: primary.store, fallback, logger, now: () => nowMs });
-    return { store, primary, advance: (ms: number) => (nowMs += ms) };
+    return { store, primary, lines, advance: (ms: number) => (nowMs += ms) };
   }
 
   async function failFirstCall(store: FallbackRateLimitStore, primary: ReturnType<typeof createControlledPrimary>) {
@@ -177,5 +177,109 @@ describe('FallbackRateLimitStore: corte automático', () => {
     expect(primary.pending).toHaveLength(2);
     primary.pending[1].resolve(1);
     await probe;
+  });
+
+  it('una respuesta tardía de un request anterior al corte no lo cierra', async () => {
+    const { store, primary } = createBreakerStore();
+    const before = store.increment('a', 60);
+    const failing = store.increment('a', 60);
+    primary.pending[1].reject(new Error('timeout'));
+    await failing;
+    primary.pending[0].resolve(1);
+    await before;
+
+    await store.increment('a', 60);
+
+    expect(primary.pending).toHaveLength(2);
+  });
+
+  it('una prueba que no responde en 1 s cuenta como fallo y corta otros 5 s', async () => {
+    const { store, primary, advance } = createBreakerStore();
+    await failFirstCall(store, primary);
+    advance(5_000);
+    void store.increment('a', 60);
+
+    advance(1_000);
+    await store.increment('a', 60);
+    advance(4_999);
+    await store.increment('a', 60);
+    expect(primary.pending).toHaveLength(2);
+
+    advance(1);
+    void store.increment('a', 60);
+    expect(primary.pending).toHaveLength(3);
+  });
+
+  it('avisa en el log cuando el principal vuelve', async () => {
+    const { store, primary, lines, advance } = createBreakerStore();
+    await failFirstCall(store, primary);
+    advance(5_000);
+
+    const probe = store.increment('a', 60);
+    primary.pending[1].resolve(1);
+    await probe;
+
+    expect(lines.filter((line) => line.level === 'info')).toEqual([
+      expect.objectContaining({ message: 'rate limit store recovered: counting in Valkey again' }),
+    ]);
+  });
+
+  it('la prueba cierra el corte aunque mientras esperaba hayan llegado otros requests', async () => {
+    const { store, primary, advance } = createBreakerStore();
+    await failFirstCall(store, primary);
+    advance(5_000);
+    const probe = store.increment('a', 60);
+    await store.increment('b', 60);
+    primary.pending[1].resolve(1);
+    await probe;
+
+    void store.increment('a', 60);
+
+    expect(primary.pending).toHaveLength(3);
+  });
+
+  it('una prueba vencida que responde tarde no cierra el corte', async () => {
+    const { store, primary, advance } = createBreakerStore();
+    await failFirstCall(store, primary);
+    advance(5_000);
+    const staleProbe = store.increment('a', 60);
+    advance(1_000);
+    await store.increment('a', 60);
+    primary.pending[1].resolve(1);
+    await staleProbe;
+
+    await store.increment('a', 60);
+
+    expect(primary.pending).toHaveLength(2);
+  });
+
+  it('una prueba vencida que responde tarde no libera a la prueba nueva', async () => {
+    const { store, primary, advance } = createBreakerStore();
+    await failFirstCall(store, primary);
+    advance(5_000);
+    const staleProbe = store.increment('a', 60);
+    advance(1_000);
+    await store.increment('a', 60);
+    advance(5_000);
+    void store.increment('a', 60);
+    primary.pending[1].resolve(1);
+    await staleProbe;
+
+    await store.increment('a', 60);
+
+    expect(primary.pending).toHaveLength(3);
+  });
+
+  it('con el corte, el aviso de caída en el log sale a lo sumo cada 30 s aunque cada prueba falle', async () => {
+    const { store, primary, lines, advance } = createBreakerStore();
+    await failFirstCall(store, primary);
+    for (let i = 1; i <= 6; i++) {
+      advance(5_000);
+      const probe = store.increment('a', 60);
+      primary.pending[i].reject(new Error('timeout'));
+      await probe;
+    }
+
+    expect(errors(lines)).toHaveLength(2);
   });
 });

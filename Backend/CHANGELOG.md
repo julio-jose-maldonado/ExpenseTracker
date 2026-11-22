@@ -9,6 +9,22 @@ El contrato HTTP para el frontend tiene su propio changelog en [`docs/API_Fronte
 
 ### 2026-11-22 · (SHA al commitear)
 
+#### fix(gateway): let new keys through when the memory store is full and harden the breaker
+
+- Gateway · `InMemoryRateLimitStore`: con el tope lleno, primero descarta las claves vencidas y, si sigue lleno, una clave nueva pasa sin contarse (devuelve 0) con un `warn` a lo sumo cada 30 s. Reemplaza al contador de desborde compartido, que con un ataque dejaba a toda la instancia en 429 y mezclaba ventanas de reglas distintas. Recibe el logger como tercer parámetro opcional.
+- Gateway · `FallbackRateLimitStore`: solo la prueba cierra el corte (una respuesta tardía de un request anterior al corte ya no lo cierra); la prueba tiene un plazo propio de 1 s y, si vence, cuenta como fallo; un `info` avisa cuando Valkey vuelve.
+- Gateway · `index.ts`: le pasa el logger al contador en memoria.
+- Gateway · `FallbackRateLimitStore.increment` partida en funciones chicas (`#shouldUseFallback`, `#isCurrentProbe`, `#closeIfCurrentProbe`, `#open`): tenía CRAP 12.
+- Gateway · mutation testing con Stryker: `stryker.config.mjs` y script `mutation` (se corre con `--mutate <archivos>`). `.stryker-tmp/` en `.gitignore`.
+- Tests: en `InMemoryRateLimitStore` (existente) los 4 del contador de desborde se reemplazaron por 4 del paso sin contar, la limpieza forzada y el aviso, y se agregó 1 de una clave que vence entre dos limpiezas. En `FallbackRateLimitStore` (existente) se agregaron 7 (respuesta tardía, plazo de la prueba, aviso de recuperación, cierre con requests en paralelo, dos de pruebas vencidas, aviso cada 30 s) y el helper del corte devuelve también las líneas del log. Los últimos salieron de los mutantes sobrevivientes de Stryker.
+
+**Dependencias**
+
+- Gateway · `@stryker-mutator/core`: — → 10.1.1 (dev)
+- Gateway · `@stryker-mutator/jest-runner`: — → 10.1.1 (dev)
+
+### 2026-11-22 · (SHA al commitear)
+
 #### fix(gateway): add a circuit breaker and an overflow counter to the rate limit fallback
 
 - Gateway · `FallbackRateLimitStore`: corte automático. Después de un fallo del principal, durante 5 s cuenta directo en memoria; vencido ese tiempo, un solo request prueba al principal mientras los demás siguen en memoria. Con Valkey colgado, la espera de 250 ms la paga un request por corte y no todos.

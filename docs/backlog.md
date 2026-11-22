@@ -82,7 +82,7 @@ Ya existe: typecheck, tests unitarios y de integración, oxlint (`correctness`, 
 
 - **Cobertura mínima** por paquete (`coverageThreshold` de Jest y Vitest), que haga fallar los tests si baja.
 - **Complejidad y tamaño:** activar en oxlint `complexity`, `max-lines-per-function`, `max-depth` y `max-params` (la versión 1.92 ya las trae).
-- **Mutation testing con Stryker**, sobre los archivos que cambiaron, antes del push. Las mutaciones que sobreviven dicen exactamente qué no controlan los tests.
+- **Mutation testing con Stryker**, sobre los archivos que cambiaron, antes del push. *(2026-11-22: instalado en el Gateway y corriendo en cada cambio con el skill `ub-mode`; falta en los otros paquetes y en el CI.)* Las mutaciones que sobreviven dicen exactamente qué no controlan los tests.
 
 Cómo se arma:
 

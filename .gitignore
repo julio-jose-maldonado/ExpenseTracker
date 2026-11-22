@@ -7,3 +7,4 @@ coverage/
 !.env.example
 **/src/generated/
 .DS_Store
+.stryker-tmp/

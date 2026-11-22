@@ -16,7 +16,7 @@ function main(): void {
   registerContainerList({ businessGrpcAddress: config.businessGrpcAddress });
   // No espera la conexión: si Valkey está caído, el Gateway arranca igual y cuenta en memoria por instancia.
   const valkey = createValkeyClient(config.valkeyUrl, logger);
-  const store = new FallbackRateLimitStore({ primary: new ValkeyRateLimitStore(valkey), fallback: new InMemoryRateLimitStore(), logger });
+  const store = new FallbackRateLimitStore({ primary: new ValkeyRateLimitStore(valkey), fallback: new InMemoryRateLimitStore(Date.now, undefined, logger), logger });
   const app = new App(logger, {
     trustedProxyHops: config.trustedProxyHops,
     rateLimit: { table: withGeneralMax(RATE_LIMITS, config.rateLimitGeneralMax), store },

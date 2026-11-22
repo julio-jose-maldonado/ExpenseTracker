@@ -52,7 +52,7 @@ La historia #1 se hace en varias tandas, cada una con su PR. Se trabaja con TDD.
 - **Por IP** (`client_ip` del contexto). El diseño tiene que permitir otras dos dimensiones, a decidir al implementar:
   - un límite global por endpoint (todos los clientes sumados), para proteger a las capas de abajo. Riesgo: un solo cliente puede agotarlo y dejar afuera al resto, así que tendría que ser bastante más alto que el límite por IP;
   - un límite por usuario, recién cuando exista la sesión (tanda 8), porque antes no hay un `user_id` confiable.
-- **Si Valkey no responde, el request pasa** y se registra un error: una caída de Valkey no puede tirar toda la API.
+- **Si Valkey no responde, se cuenta en memoria** por instancia y se registra un error: una caída de Valkey no puede tirar toda la API, pero tampoco dejarla sin límite.
 - **Hecho a mano**, sin librería: ventana fija con un contador en Valkey. El incremento y el vencimiento de la clave se hacen en una sola operación atómica (script Lua con `INCR` + `EXPIRE`), y la clave incluye el número de ventana, así un contador nunca queda sin vencimiento ni bloquea a alguien para siempre.
 - **Respuesta:** 429 con el código `TOO_MANY_REQUESTS` y el header `Retry-After`.
 - `/isAlive` queda exento (lo consulta el balanceador). El límite general se puede cambiar por variable de entorno; las reglas propias van en el código.

@@ -77,7 +77,7 @@ pnpm --filter @expense-tracker/gateway test:integration       # contra el Valkey
 
 Los tests de integración y drizzle-kit toman las variables de `Backend/DataAccess/.env`; los del Gateway, `VALKEY_URL` de `Backend/Gateway/.env` (sin la variable usan `redis://127.0.0.1:6380`).
 
-Si el Gateway arranca sin Valkey levantado, atiende igual pero sin límite de requests, y lo avisa con un error en el log.
+Si el Gateway arranca sin Valkey levantado, atiende igual con el límite contado en memoria, y lo avisa con un error en el log.
 
 ## 4. Apagar
 

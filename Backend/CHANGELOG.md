@@ -7,6 +7,15 @@ El contrato HTTP para el frontend tiene su propio changelog en [`docs/API_Fronte
 
 ## Historial
 
+### 2026-11-22 · (SHA al commitear)
+
+#### fix(gateway): count rate limits in memory when Valkey fails
+
+- Gateway · `FallbackRateLimitStore`: envuelve al contador de Valkey y, si falla, cuenta en un `InMemoryRateLimitStore` de la instancia en vez de dejar pasar el request sin contar. Registra la caída a lo sumo una vez cada 30 s (`rate limit store failed: counting in memory per instance`).
+- Gateway · `InMemoryRateLimitStore`: tope de 100.000 claves; con el tope lleno, una clave nueva desplaza a la más vieja.
+- Gateway · `index.ts`: el contador de producción es `FallbackRateLimitStore` (Valkey + memoria).
+- Tests nuevos: `FallbackRateLimitStore` (5); en `InMemoryRateLimitStore` (existente) se agregaron 2 del tope.
+
 ### 2026-11-15 · (SHA al commitear)
 
 #### feat(gateway): add Valkey-backed rate limit and move translations to core

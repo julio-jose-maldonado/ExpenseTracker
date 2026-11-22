@@ -30,4 +30,24 @@ describe('InMemoryRateLimitStore', () => {
 
     expect(store.size).toBe(2);
   });
+
+  it('con el tope de claves lleno, una clave nueva desplaza a la más vieja', async () => {
+    const store = new InMemoryRateLimitStore(() => 0, 2);
+
+    await store.increment('a', 60);
+    await store.increment('b', 60);
+    await store.increment('c', 60);
+
+    expect(store.size).toBe(2);
+    expect(await store.increment('b', 60)).toBe(2);
+    expect(await store.increment('c', 60)).toBe(2);
+  });
+
+  it('sin tope explícito admite 100.000 claves', async () => {
+    const store = new InMemoryRateLimitStore(() => 0);
+
+    for (let i = 0; i <= 100_000; i++) await store.increment(String(i), 60);
+
+    expect(store.size).toBe(100_000);
+  });
 });

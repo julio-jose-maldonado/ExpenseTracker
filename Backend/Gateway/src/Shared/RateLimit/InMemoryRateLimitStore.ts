@@ -34,7 +34,8 @@ export class InMemoryRateLimitStore implements IRateLimitStore {
   #nextFullLogAtMs = 0;
 
   constructor(
-    private readonly now: () => number = Date.now,
+    // Por defecto, un reloj monotónico: mide plazos y no salta si se ajusta la hora del sistema (NTP).
+    private readonly now: () => number = () => performance.now(),
     private readonly maxKeys: number = DEFAULT_MAX_KEYS,
     private readonly logger?: Logger,
   ) {}

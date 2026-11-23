@@ -109,22 +109,23 @@ function createControlledPrimary() {
   return { store, pending };
 }
 
+// Contador con reloj manual y un principal que responde cuando el test lo decide.
+function createBreakerStore() {
+  let nowMs = NOW_MS;
+  const { logger, lines } = createLines();
+  const primary = createControlledPrimary();
+  const fallback = new InMemoryRateLimitStore(() => nowMs);
+  const store = new FallbackRateLimitStore({ primary: primary.store, fallback, logger, now: () => nowMs });
+  return { store, primary, lines, advance: (ms: number) => (nowMs += ms) };
+}
+
+async function failFirstCall(store: FallbackRateLimitStore, primary: ReturnType<typeof createControlledPrimary>) {
+  const first = store.increment('a', 60);
+  primary.pending[0].reject(new Error('timeout'));
+  await first;
+}
+
 describe('FallbackRateLimitStore: corte automático', () => {
-  function createBreakerStore() {
-    let nowMs = NOW_MS;
-    const { logger, lines } = createLines();
-    const primary = createControlledPrimary();
-    const fallback = new InMemoryRateLimitStore(() => nowMs);
-    const store = new FallbackRateLimitStore({ primary: primary.store, fallback, logger, now: () => nowMs });
-    return { store, primary, lines, advance: (ms: number) => (nowMs += ms) };
-  }
-
-  async function failFirstCall(store: FallbackRateLimitStore, primary: ReturnType<typeof createControlledPrimary>) {
-    const first = store.increment('a', 60);
-    primary.pending[0].reject(new Error('timeout'));
-    await first;
-  }
-
   it('después de un fallo no consulta al principal durante 5 s', async () => {
     const { store, primary, advance } = createBreakerStore();
     await failFirstCall(store, primary);
@@ -235,21 +236,38 @@ describe('FallbackRateLimitStore: corte automático', () => {
   });
 });
 
+describe('FallbackRateLimitStore: reloj por defecto', () => {
+  it('un salto de la hora del sistema no acorta el corte', async () => {
+    const realNow = Date.now.bind(Date);
+    let jumpMs = 0;
+    const spy = jest.spyOn(Date, 'now').mockImplementation(() => realNow() + jumpMs);
+    try {
+      const { logger } = createLines();
+      const primary = createPrimary();
+      const store = new FallbackRateLimitStore({ primary: primary.store, fallback: new InMemoryRateLimitStore(), logger });
+      primary.state.down = true;
+      await store.increment('a', 60);
+      primary.state.down = false;
+      // La hora del sistema salta 10 s (ajuste de NTP): el corte de 5 s tiene que seguir abierto.
+      jumpMs = 10_000;
+
+      expect(await store.increment('b', 60)).toBe(1);
+      expect(await store.increment('b', 60)).toBe(2);
+
+      // Si el corte se hubiera cerrado, 'b' ya estaría contado en el principal y esto daría 2.
+      expect(await primary.store.increment('b', 60)).toBe(1);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+});
+
 describe('FallbackRateLimitStore: consulta que no responde', () => {
   beforeEach(() => jest.useFakeTimers());
   afterEach(() => jest.useRealTimers());
 
-  function createHangingStore() {
-    let nowMs = NOW_MS;
-    const { logger, lines } = createLines();
-    const primary = createControlledPrimary();
-    const fallback = new InMemoryRateLimitStore(() => nowMs);
-    const store = new FallbackRateLimitStore({ primary: primary.store, fallback, logger, now: () => nowMs });
-    return { store, primary, lines, advance: (ms: number) => (nowMs += ms) };
-  }
-
   it('si el principal no responde en 1 s, el request cuenta en memoria, se registra el fallo y se corta', async () => {
-    const { store, primary, lines } = createHangingStore();
+    const { store, primary, lines } = createBreakerStore();
 
     const hanging = store.increment('a', 60);
     await jest.advanceTimersByTimeAsync(1_000);
@@ -261,7 +279,7 @@ describe('FallbackRateLimitStore: consulta que no responde', () => {
   });
 
   it('una prueba que no responde en 1 s cuenta como fallo y corta otros 5 s', async () => {
-    const { store, primary, advance } = createHangingStore();
+    const { store, primary, advance } = createBreakerStore();
     const first = store.increment('a', 60);
     await jest.advanceTimersByTimeAsync(1_000);
     await first;
@@ -280,7 +298,7 @@ describe('FallbackRateLimitStore: consulta que no responde', () => {
   });
 
   it('la respuesta tardía de una prueba que ya venció no cierra el corte ni libera a la prueba nueva', async () => {
-    const { store, primary, advance } = createHangingStore();
+    const { store, primary, advance } = createBreakerStore();
     const first = store.increment('a', 60);
     await jest.advanceTimersByTimeAsync(1_000);
     await first;

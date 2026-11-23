@@ -9,6 +9,16 @@ El contrato HTTP para el frontend tiene su propio changelog en [`docs/API_Fronte
 
 ### 2026-11-22 · (SHA al commitear)
 
+#### fix(gateway): measure rate limit fallback timing with a monotonic clock
+
+- Gateway · `InMemoryRateLimitStore` y `FallbackRateLimitStore`: por defecto miden vencimientos, limpiezas, el corte y los intervalos de log con `performance.now()` en vez de `Date.now`. Un ajuste de la hora del sistema (NTP) hacia atrás dejaba las claves vencidas como vigentes y apagaba la limpieza (con el tope lleno, las claves nuevas pasaban sin contarse); hacia adelante vencía todas las claves en memoria y podía cerrar el corte antes de tiempo. El número de ventana sigue saliendo de la hora del sistema.
+- Gateway · `createValkeyClient`: el aviso de error de conexión se espacia con `performance.now()`, así un ajuste de la hora no lo silencia.
+- Gateway · `index.ts`: el contador en memoria ya no recibe `Date.now`.
+- Docs: `Decisiones_Tecnicas.md` explica el reloj monotónico y aclara que, con el tope lleno, entre dos limpiezas forzadas (100 ms) una clave nueva puede pasar sin contarse aunque haya vencidas.
+- Tests (con OK del usuario): se agregó 1 en `InMemoryRateLimitStore` y 1 en `FallbackRateLimitStore`, con la hora del sistema que salta, y 2 en `ValkeyClient` (el aviso de conexión sale uno por intervalo y no se adelanta con un salto de la hora). En `InMemoryRateLimitStore` los dos tests de tiempo pasan de 1 s a 3 s de margen y uno cambia de nombre para describir lo que controla. En `FallbackRateLimitStore` las funciones auxiliares salen de sus `describe` (aviso de oxlint) y las dos iguales quedan en una.
+
+### 2026-11-22 · (SHA al commitear)
+
 #### fix(gateway): throttle the forced purge of the in-memory rate limit store
 
 - Gateway · `InMemoryRateLimitStore`: con el tope lleno, la limpieza forzada corre a lo sumo una vez cada 100 ms, en vez de cada vez que vence una clave. Reemplaza a la cota del vencimiento más próximo del commit anterior: en un ataque las claves vencen de a una por milisegundo y el mapa se volvía a recorrer casi en cada request (20.000 claves nuevas tardaban 59 s; ahora unos ms).

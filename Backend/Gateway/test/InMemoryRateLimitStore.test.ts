@@ -83,15 +83,16 @@ describe('InMemoryRateLimitStore', () => {
     expect(store.size).toBe(2);
   });
 
-  it('con el tope lleno y nada vencido, una clave nueva no recorre el mapa', async () => {
+  it('con el tope lleno y el reloj quieto, las claves nuevas no recorren el mapa cada vez', async () => {
     const store = new InMemoryRateLimitStore(() => 0, 100_000);
     for (let i = 0; i < 100_000; i++) await store.increment(`k${i}`, 60);
 
-    // Recorriendo el mapa en cada una serían 2.000 millones de vueltas: el test se pasaría del timeout.
+    // Recorriendo el mapa en cada una serían 2.000 millones de vueltas. Margen amplio para CI y Stryker:
+    // normalmente tarda unos ms, y la versión con el error tardaba 295 s.
     const started = performance.now();
     for (let i = 0; i < 20_000; i++) await store.increment(`n${i}`, 60);
 
-    expect(performance.now() - started).toBeLessThan(1_000);
+    expect(performance.now() - started).toBeLessThan(3_000);
   });
 
   it('con el tope lleno y una clave venciendo por milisegundo, no recorre el mapa en cada request', async () => {
@@ -103,14 +104,14 @@ describe('InMemoryRateLimitStore', () => {
       await store.increment(`k${i}`, 100);
     }
 
-    // Recorriendo el mapa cada vez que vence una clave serían 400 millones de vueltas.
+    // Recorriendo el mapa cada vez que vence una clave serían 400 millones de vueltas (59 s).
     const started = performance.now();
     for (let i = 0; i < 20_000; i++) {
       nowMs = 100_000 + i;
       await store.increment(`n${i}`, 100);
     }
 
-    expect(performance.now() - started).toBeLessThan(1_000);
+    expect(performance.now() - started).toBeLessThan(3_000);
   });
 
   it('con el tope lleno avisa en el log a lo sumo una vez por intervalo', async () => {
@@ -137,6 +138,22 @@ describe('InMemoryRateLimitStore', () => {
       expect.objectContaining({ message: 'rate limit memory store full: new keys are not being limited' }),
       expect.objectContaining({ message: 'rate limit memory store full: new keys are not being limited' }),
     ]);
+  });
+
+  it('por defecto mide los vencimientos con un reloj que no salta cuando se ajusta la hora del sistema', async () => {
+    const realNow = Date.now.bind(Date);
+    let jumpMs = 0;
+    const spy = jest.spyOn(Date, 'now').mockImplementation(() => realNow() + jumpMs);
+    try {
+      const store = new InMemoryRateLimitStore();
+      await store.increment('a', 60);
+      // La hora del sistema salta 2 minutos (ajuste de NTP): el conteo no tiene que reiniciarse.
+      jumpMs = 120_000;
+
+      expect(await store.increment('a', 60)).toBe(2);
+    } finally {
+      spy.mockRestore();
+    }
   });
 
   it('sin tope explícito admite 100.000 claves', async () => {

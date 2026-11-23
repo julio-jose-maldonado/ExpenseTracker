@@ -37,7 +37,8 @@ export class FallbackRateLimitStore implements IRateLimitStore {
   #openUntilMs = 0;
   #probing = false;
 
-  constructor({ primary, fallback, logger, now = Date.now }: FallbackRateLimitStoreDependencies) {
+  // Por defecto, un reloj monotónico: el corte mide plazos y no puede saltar si se ajusta la hora del sistema.
+  constructor({ primary, fallback, logger, now = () => performance.now() }: FallbackRateLimitStoreDependencies) {
     this.#primary = primary;
     this.#fallback = fallback;
     this.#logger = logger;

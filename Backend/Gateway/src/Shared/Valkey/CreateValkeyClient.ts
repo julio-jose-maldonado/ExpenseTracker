@@ -20,10 +20,11 @@ export function createValkeyClient(url: string, logger: Logger): Redis {
   });
 
   // Sin un listener de 'error', Node tira el proceso con el primer error de conexión.
+  // Reloj monotónico: un ajuste de la hora del sistema no puede silenciar el aviso.
   let nextErrorLogAtMs = 0;
   client.on('error', (error: Error) => {
-    if (Date.now() < nextErrorLogAtMs) return;
-    nextErrorLogAtMs = Date.now() + ERROR_LOG_INTERVAL_MS;
+    if (performance.now() < nextErrorLogAtMs) return;
+    nextErrorLogAtMs = performance.now() + ERROR_LOG_INTERVAL_MS;
     // Solo nombre, código y mensaje: el error no incluye la URL, que puede traer la contraseña.
     logger.error({ error_name: error.name, error_code: (error as NodeJS.ErrnoException).code, error_message: error.message }, 'valkey connection error');
   });

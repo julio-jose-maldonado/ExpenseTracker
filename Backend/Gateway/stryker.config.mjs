@@ -16,7 +16,8 @@ export default {
   plugins: ['@stryker-mutator/jest-runner'],
   jest: { projectType: 'custom', configFile: 'package.json', config: jestConfig },
   coverageAnalysis: 'perTest',
-  mutate: ['src/**/*.ts'],
+  // Por defecto todo src/ menos el código generado; en el flujo de trabajo se pasa --mutate con lo tocado.
+  mutate: ['src/**/*.ts', '!src/generated/**'],
   reporters: ['clear-text', 'progress'],
   tempDirName: '.stryker-tmp',
   cleanTempDir: 'always',

@@ -9,6 +9,16 @@ El contrato HTTP para el frontend tiene su propio changelog en [`docs/API_Fronte
 
 ### 2026-11-22 · (SHA al commitear)
 
+#### fix(gateway): bound every Valkey call and stop scanning the full memory store
+
+- Gateway · `InMemoryRateLimitStore`: la limpieza forzada con el tope lleno solo recorre el mapa si ya venció alguna clave (cota del vencimiento más próximo). Antes lo recorría entero en cada request con clave nueva: 20.000 claves nuevas con el tope lleno tardaban 295 s.
+- Gateway · `FallbackRateLimitStore`: cada consulta al principal compite con un temporizador de 1 s; si no responde, cuenta como fallo (sigue en memoria, abre el corte, registra el error). Reemplaza al plazo por reloj de la prueba y a la numeración de pruebas, que liberaban el corte pero dejaban colgado el request.
+- Gateway · `App`: el contador en memoria por defecto recibe el logger.
+- Gateway · `stryker.config.mjs`: por defecto no muta `src/generated/`.
+- Tests: en `FallbackRateLimitStore` (existente) se reemplazaron, con OK del usuario, los 3 tests del plazo por reloj por 3 equivalentes con el temporizador, y se suma el caso del principal colgado con el corte cerrado. En `InMemoryRateLimitStore` (existente) se agregó 1 de la limpieza sin recorrer el mapa.
+
+### 2026-11-22 · (SHA al commitear)
+
 #### fix(gateway): let new keys through when the memory store is full and harden the breaker
 
 - Gateway · `InMemoryRateLimitStore`: con el tope lleno, primero descarta las claves vencidas y, si sigue lleno, una clave nueva pasa sin contarse (devuelve 0) con un `warn` a lo sumo cada 30 s. Reemplaza al contador de desborde compartido, que con un ataque dejaba a toda la instancia en 429 y mezclaba ventanas de reglas distintas. Recibe el logger como tercer parámetro opcional.

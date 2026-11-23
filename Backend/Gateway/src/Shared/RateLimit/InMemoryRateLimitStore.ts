@@ -23,6 +23,9 @@ interface Entry {
 export class InMemoryRateLimitStore implements IRateLimitStore {
   readonly #entries = new Map<string, Entry>();
   #nextPurgeAtMs = 0;
+  // Cota inferior del vencimiento más próximo: si todavía no llegó, no hay nada vencido y la limpieza
+  // forzada no recorre el mapa. Sin esto, con el tope lleno cada request con clave nueva recorría todo.
+  #earliestExpiryMs = Number.POSITIVE_INFINITY;
   #nextFullLogAtMs = 0;
 
   constructor(
@@ -41,7 +44,7 @@ export class InMemoryRateLimitStore implements IRateLimitStore {
     const current = this.#entries.get(key);
     if (!current && this.#entries.size >= this.maxKeys) {
       // La limpieza periódica corre a lo sumo una vez por segundo: puede haber claves vencidas ocupando lugar.
-      this.#purgeExpired(nowMs, true);
+      if (nowMs >= this.#earliestExpiryMs) this.#purgeExpired(nowMs, true);
       if (this.#entries.size >= this.maxKeys) {
         this.#logFull(nowMs);
         return Promise.resolve(0);
@@ -50,6 +53,7 @@ export class InMemoryRateLimitStore implements IRateLimitStore {
     const entry = current && current.expiresAtMs > nowMs ? current : { count: 0, expiresAtMs: nowMs + ttlSeconds * 1000 };
     entry.count += 1;
     this.#entries.set(key, entry);
+    this.#earliestExpiryMs = Math.min(this.#earliestExpiryMs, entry.expiresAtMs);
     return Promise.resolve(entry.count);
   }
 
@@ -63,8 +67,11 @@ export class InMemoryRateLimitStore implements IRateLimitStore {
   #purgeExpired(nowMs: number, force = false): void {
     if (!force && nowMs < this.#nextPurgeAtMs) return;
     this.#nextPurgeAtMs = nowMs + 1000;
+    let earliest = Number.POSITIVE_INFINITY;
     for (const [key, entry] of this.#entries) {
       if (entry.expiresAtMs <= nowMs) this.#entries.delete(key);
+      else earliest = Math.min(earliest, entry.expiresAtMs);
     }
+    this.#earliestExpiryMs = earliest;
   }
 }

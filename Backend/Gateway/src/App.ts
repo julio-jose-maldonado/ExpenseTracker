@@ -53,7 +53,7 @@ export class App {
   }
 
   #rateLimit(): RequestHandler {
-    const { now = Date.now, store = new InMemoryRateLimitStore(now) } = this.options.rateLimit ?? {};
+    const { now = Date.now, store = new InMemoryRateLimitStore(now, undefined, this.logger) } = this.options.rateLimit ?? {};
     return createRateLimit({ logger: this.logger, table: this.#rateLimits, store, now, endpoints: () => this.#endpoints });
   }
 

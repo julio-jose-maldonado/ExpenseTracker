@@ -193,23 +193,6 @@ describe('FallbackRateLimitStore: corte automático', () => {
     expect(primary.pending).toHaveLength(2);
   });
 
-  it('una prueba que no responde en 1 s cuenta como fallo y corta otros 5 s', async () => {
-    const { store, primary, advance } = createBreakerStore();
-    await failFirstCall(store, primary);
-    advance(5_000);
-    void store.increment('a', 60);
-
-    advance(1_000);
-    await store.increment('a', 60);
-    advance(4_999);
-    await store.increment('a', 60);
-    expect(primary.pending).toHaveLength(2);
-
-    advance(1);
-    void store.increment('a', 60);
-    expect(primary.pending).toHaveLength(3);
-  });
-
   it('avisa en el log cuando el principal vuelve', async () => {
     const { store, primary, lines, advance } = createBreakerStore();
     await failFirstCall(store, primary);
@@ -238,38 +221,6 @@ describe('FallbackRateLimitStore: corte automático', () => {
     expect(primary.pending).toHaveLength(3);
   });
 
-  it('una prueba vencida que responde tarde no cierra el corte', async () => {
-    const { store, primary, advance } = createBreakerStore();
-    await failFirstCall(store, primary);
-    advance(5_000);
-    const staleProbe = store.increment('a', 60);
-    advance(1_000);
-    await store.increment('a', 60);
-    primary.pending[1].resolve(1);
-    await staleProbe;
-
-    await store.increment('a', 60);
-
-    expect(primary.pending).toHaveLength(2);
-  });
-
-  it('una prueba vencida que responde tarde no libera a la prueba nueva', async () => {
-    const { store, primary, advance } = createBreakerStore();
-    await failFirstCall(store, primary);
-    advance(5_000);
-    const staleProbe = store.increment('a', 60);
-    advance(1_000);
-    await store.increment('a', 60);
-    advance(5_000);
-    void store.increment('a', 60);
-    primary.pending[1].resolve(1);
-    await staleProbe;
-
-    await store.increment('a', 60);
-
-    expect(primary.pending).toHaveLength(3);
-  });
-
   it('con el corte, el aviso de caída en el log sale a lo sumo cada 30 s aunque cada prueba falle', async () => {
     const { store, primary, lines, advance } = createBreakerStore();
     await failFirstCall(store, primary);
@@ -281,5 +232,71 @@ describe('FallbackRateLimitStore: corte automático', () => {
     }
 
     expect(errors(lines)).toHaveLength(2);
+  });
+});
+
+describe('FallbackRateLimitStore: consulta que no responde', () => {
+  beforeEach(() => jest.useFakeTimers());
+  afterEach(() => jest.useRealTimers());
+
+  function createHangingStore() {
+    let nowMs = NOW_MS;
+    const { logger, lines } = createLines();
+    const primary = createControlledPrimary();
+    const fallback = new InMemoryRateLimitStore(() => nowMs);
+    const store = new FallbackRateLimitStore({ primary: primary.store, fallback, logger, now: () => nowMs });
+    return { store, primary, lines, advance: (ms: number) => (nowMs += ms) };
+  }
+
+  it('si el principal no responde en 1 s, el request cuenta en memoria, se registra el fallo y se corta', async () => {
+    const { store, primary, lines } = createHangingStore();
+
+    const hanging = store.increment('a', 60);
+    await jest.advanceTimersByTimeAsync(1_000);
+
+    expect(await hanging).toBe(1);
+    expect(errors(lines)).toHaveLength(1);
+    await store.increment('a', 60);
+    expect(primary.pending).toHaveLength(1);
+  });
+
+  it('una prueba que no responde en 1 s cuenta como fallo y corta otros 5 s', async () => {
+    const { store, primary, advance } = createHangingStore();
+    const first = store.increment('a', 60);
+    await jest.advanceTimersByTimeAsync(1_000);
+    await first;
+    advance(5_000);
+
+    const probe = store.increment('a', 60);
+    await jest.advanceTimersByTimeAsync(1_000);
+    await probe;
+    advance(4_999);
+    await store.increment('a', 60);
+    expect(primary.pending).toHaveLength(2);
+
+    advance(1);
+    void store.increment('a', 60);
+    expect(primary.pending).toHaveLength(3);
+  });
+
+  it('la respuesta tardía de una prueba que ya venció no cierra el corte ni libera a la prueba nueva', async () => {
+    const { store, primary, advance } = createHangingStore();
+    const first = store.increment('a', 60);
+    await jest.advanceTimersByTimeAsync(1_000);
+    await first;
+    advance(5_000);
+    const staleProbe = store.increment('a', 60);
+    await jest.advanceTimersByTimeAsync(1_000);
+    await staleProbe;
+
+    primary.pending[1].resolve(1);
+    await store.increment('a', 60);
+    expect(primary.pending).toHaveLength(2);
+
+    advance(5_000);
+    void store.increment('a', 60);
+    primary.pending[1].resolve(1);
+    await store.increment('a', 60);
+    expect(primary.pending).toHaveLength(3);
   });
 });

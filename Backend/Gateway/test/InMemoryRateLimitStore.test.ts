@@ -83,6 +83,17 @@ describe('InMemoryRateLimitStore', () => {
     expect(store.size).toBe(2);
   });
 
+  it('con el tope lleno y nada vencido, una clave nueva no recorre el mapa', async () => {
+    const store = new InMemoryRateLimitStore(() => 0, 100_000);
+    for (let i = 0; i < 100_000; i++) await store.increment(`k${i}`, 60);
+
+    // Recorriendo el mapa en cada una serían 2.000 millones de vueltas: el test se pasaría del timeout.
+    const started = performance.now();
+    for (let i = 0; i < 20_000; i++) await store.increment(`n${i}`, 60);
+
+    expect(performance.now() - started).toBeLessThan(1_000);
+  });
+
   it('con el tope lleno avisa en el log a lo sumo una vez por intervalo', async () => {
     let nowMs = 0;
     const lines: Array<Record<string, unknown>> = [];

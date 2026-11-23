@@ -7,7 +7,7 @@ Las capas internas (Business, DataAccess) no se exponen: el frontend solo habla 
 
 La entrada más nueva arriba, con el SHA completo y la fecha del commit que cambió el contrato.
 
-### 2026-11-15 · (SHA al commitear)
+### 2026-11-15 · 244cd171e49f5ff27608fe82ebeae5612353d48d
 
 - Límite de requests: 10 por segundo por IP y por endpoint (`GET /isAlive` exento). Pasado el límite, 429 `TOO_MANY_REQUESTS` con el header `Retry-After`. Código de error nuevo: `TOO_MANY_REQUESTS`.
 - Un parámetro de ruta mal codificado responde 400 `MALFORMED_REQUEST` (antes 500 `INTERNAL`).

@@ -7,7 +7,7 @@ El contrato HTTP para el frontend tiene su propio changelog en [`docs/API_Fronte
 
 ## Historial
 
-### 2026-11-22 · (SHA al commitear)
+### 2026-11-22 · 4d6b909
 
 #### fix(gateway): measure rate limit fallback timing with a monotonic clock
 
@@ -17,7 +17,7 @@ El contrato HTTP para el frontend tiene su propio changelog en [`docs/API_Fronte
 - Docs: `Decisiones_Tecnicas.md` explica el reloj monotónico y aclara que, con el tope lleno, entre dos limpiezas forzadas (100 ms) una clave nueva puede pasar sin contarse aunque haya vencidas.
 - Tests (con OK del usuario): se agregó 1 en `InMemoryRateLimitStore` y 1 en `FallbackRateLimitStore`, con la hora del sistema que salta, y 2 en `ValkeyClient` (el aviso de conexión sale uno por intervalo y no se adelanta con un salto de la hora). En `InMemoryRateLimitStore` los dos tests de tiempo pasan de 1 s a 3 s de margen y uno cambia de nombre para describir lo que controla. En `FallbackRateLimitStore` las funciones auxiliares salen de sus `describe` (aviso de oxlint) y las dos iguales quedan en una.
 
-### 2026-11-22 · (SHA al commitear)
+### 2026-11-22 · 5276331
 
 #### fix(gateway): throttle the forced purge of the in-memory rate limit store
 
@@ -25,7 +25,7 @@ El contrato HTTP para el frontend tiene su propio changelog en [`docs/API_Fronte
 - Docs: corregido cuándo vence una clave en memoria (`windowSeconds` desde su primer request, no al terminar la ventana) y la decisión de que el respaldo es un modo degradado pasa a su propia sección al final de `Decisiones_Tecnicas.md`.
 - Tests: en `InMemoryRateLimitStore` (existente) se agregó 1 con claves que vencen de a una por milisegundo.
 
-### 2026-11-22 · (SHA al commitear)
+### 2026-11-22 · cd7758c
 
 #### fix(gateway): bound every Valkey call and stop scanning the full memory store
 
@@ -35,7 +35,7 @@ El contrato HTTP para el frontend tiene su propio changelog en [`docs/API_Fronte
 - Gateway · `stryker.config.mjs`: por defecto no muta `src/generated/`.
 - Tests: en `FallbackRateLimitStore` (existente) se reemplazaron, con OK del usuario, los 3 tests del plazo por reloj por 3 equivalentes con el temporizador, y se suma el caso del principal colgado con el corte cerrado. En `InMemoryRateLimitStore` (existente) se agregó 1 de la limpieza sin recorrer el mapa.
 
-### 2026-11-22 · (SHA al commitear)
+### 2026-11-22 · 599e569
 
 #### fix(gateway): let new keys through when the memory store is full and harden the breaker
 
@@ -51,7 +51,7 @@ El contrato HTTP para el frontend tiene su propio changelog en [`docs/API_Fronte
 - Gateway · `@stryker-mutator/core`: — → 10.1.1 (dev)
 - Gateway · `@stryker-mutator/jest-runner`: — → 10.1.1 (dev)
 
-### 2026-11-22 · (SHA al commitear)
+### 2026-11-22 · d1e04b8
 
 #### fix(gateway): add a circuit breaker and an overflow counter to the rate limit fallback
 
@@ -65,7 +65,7 @@ El contrato HTTP para el frontend tiene su propio changelog en [`docs/API_Fronte
 
 - Raíz · `router` (transitiva de Express): `^2.2.0` (resolvía 2.2.0) → 2.2.0 fijada con override.
 
-### 2026-11-22 · (SHA al commitear)
+### 2026-11-22 · 655e8e9
 
 #### fix(gateway): count rate limits in memory when Valkey fails
 
@@ -74,7 +74,7 @@ El contrato HTTP para el frontend tiene su propio changelog en [`docs/API_Fronte
 - Gateway · `index.ts`: el contador de producción es `FallbackRateLimitStore` (Valkey + memoria).
 - Tests nuevos: `FallbackRateLimitStore` (5); en `InMemoryRateLimitStore` (existente) se agregaron 2 del tope.
 
-### 2026-11-15 · (SHA al commitear)
+### 2026-11-15 · 244cd17
 
 #### feat(gateway): add Valkey-backed rate limit and move translations to core
 

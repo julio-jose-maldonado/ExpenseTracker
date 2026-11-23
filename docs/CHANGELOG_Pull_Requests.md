@@ -3,6 +3,54 @@
 Registro del título y la descripción de cada PR, tal como se pegaron en GitHub (en inglés). El más nuevo arriba.
 El detalle técnico por commit está en [`Backend/CHANGELOG.md`](../Backend/CHANGELOG.md) y el contrato HTTP en [`docs/API_Frontend.md`](API_Frontend.md).
 
+### 2026-11-22 · feature/gateway-rate-limit → develop
+
+**Last commit:** `4d6b909` — `fix(gateway): measure rate limit fallback timing with a monotonic clock`
+
+**Title:** feat(gateway): add Valkey-backed rate limit with an in-memory fallback and move translations to core
+
+**Description:**
+
+## Summary
+
+Adds rate limiting to the Gateway: a fixed window per client IP and per endpoint, counted in Valkey so every Gateway instance shares the count. If Valkey fails, each instance counts in memory, so the API is never left without a limit. Translations move from the Gateway to `core`. The in-memory fallback is a degraded mode: it does not protect against distributed attacks, which AWS WAF in front of the ALB will cover at the infra stage.
+
+## Changes
+
+### Backend/Gateway
+- One rate limit middleware, registered before body parsing. Over the limit it returns 429 `TOO_MANY_REQUESTS` with `Retry-After`.
+- Rate limit table (`RateLimits.ts`): a general limit (10 per second, overridable with `RATE_LIMIT_GENERAL_MAX`), per-endpoint overrides and exemptions (`GET /isAlive`). The App refuses to start if a rule or exemption points to a route that does not exist.
+- The target endpoint is resolved before routing with Express matchers; routers are mounted without prefix.
+- Client key: IPv6 counted per /64 block, IPv4-mapped addresses (also in hex) counted as IPv4.
+- `ValkeyRateLimitStore`: atomic `INCR` + `EXPIRE` Lua script, sent as `EVALSHA`. Client: `iovalkey`, 250 ms command timeout, no offline queue. Connection errors are logged at most every 30 s, without the URL.
+- `FallbackRateLimitStore`: counts in Valkey and falls back to memory when it fails. A circuit breaker sends everything to memory for 5 s after a failure, then a single request probes Valkey. Every Valkey call is capped at 1 s, so a call that never answers cannot hang the request.
+- `InMemoryRateLimitStore`: capped at 100,000 keys. When full, existing counts are kept and new keys pass uncounted, with a throttled `warn`. Expired keys are purged once per second, and at most once every 100 ms when the store is full.
+- Timing inside the stores uses a monotonic clock (`performance.now()`), so an NTP step cannot keep expired keys alive or reset counts. Window numbers still come from the wall clock, because instances have to agree on them.
+- New required variable `VALKEY_URL` (`redis://` or `rediss://` with a host; the error message never shows its value).
+- Malformed route parameters map to 400 `MALFORMED_REQUEST`.
+- Mutation testing with Stryker (`pnpm --filter @expense-tracker/gateway mutation`).
+
+### Packages/core
+- Translations, translation keys and `createTranslator` (i18next) move here from the Gateway.
+- New `ErrorCode.TOO_MANY_REQUESTS`, mapped to gRPC `RESOURCE_EXHAUSTED`.
+
+### CI and tooling
+- Gateway integration tests run against Valkey in CI (`docker compose up --wait postgres valkey`).
+- dependency-cruiser: only the Gateway and DataAccess may use Valkey clients.
+- `pnpm-workspace.yaml` pins `express>router` to 2.2.0, because endpoint resolution reads the Express 5 router internals.
+
+### Tests
+- Middleware (limits, overrides, exemptions, 429 and `Retry-After`, store failure), endpoint resolution, client key, env config.
+- Stores: in-memory (expiry, cap, purge performance, clock jumps), fallback (breaker, probe, 1 s cap, late answers, log throttling), Valkey client (fast failure, no password in logs, log throttling), and Valkey integration tests.
+
+### docs
+- `Decisiones_Tecnicas.md`: rate limit decisions, translations in `core`, Stryker, and the fallback as a degraded mode.
+- `API_Frontend.md`: the 429 response and its code. `Desarrollo_Local.md`: Valkey setup. `backlog.md`: tanda 6 done.
+
+## Endpoints
+
+No new routes. Every route except `GET /isAlive` can now answer 429 `TOO_MANY_REQUESTS` with a `Retry-After` header.
+
 ### 2026-11-15 · feature/grpc-errors-and-deadlines → develop
 
 **Last commit:** `0098175` — `feat(core): rebuild AppError across gRPC hops and propagate the deadline`

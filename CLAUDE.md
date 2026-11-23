@@ -30,7 +30,7 @@ ExpenseTracker/      workspace pnpm (los comandos se corren desde la raíz)
 └── Packages/
     ├── types/       contrato HTTP compartido App ↔ Gateway (se crea en la historia #1)
     ├── proto/       contratos gRPC (solo backend)
-    └── core/        errores, logger, contexto (solo backend)
+    └── core/        errores, logger, contexto, traducciones (solo backend)
 ```
 
 ## Stack
@@ -48,7 +48,7 @@ ExpenseTracker/      workspace pnpm (los comandos se corren desde la raíz)
 ## Comandos (desde la raíz)
 
 - `pnpm build` · `pnpm typecheck` · `pnpm test` · `pnpm lint` · `pnpm depcruise`
-- `docker compose up -d --wait` (Postgres + Valkey) · `pnpm --filter @expense-tracker/data-access test:integration` · `... db:generate` / `db:migrate`
+- `docker compose up -d --wait` (Postgres + Valkey) · `pnpm --filter @expense-tracker/data-access test:integration` (Postgres) · `pnpm --filter @expense-tracker/gateway test:integration` (Valkey) · `... db:generate` / `db:migrate`
 - App: `pnpm --filter @expense-tracker/app dev` (http://localhost:5173, proxy `/api` → Gateway). Tests del front con Vitest.
 - Variables y pasos para levantar todo: `docs/Desarrollo_Local.md`
 
@@ -80,7 +80,8 @@ ExpenseTracker/      workspace pnpm (los comandos se corren desde la raíz)
 - Reglas de validación compartidas (largo y regex de contraseña, monedas) como constantes en `Packages/types`: las usan express-validator en el Gateway y React Hook Form en la App. Sin zod.
 - Contraseñas: argon2id.
 - Validación en el Gateway: express-validator.
-- Errores: Negocio y Datos devuelven **códigos** de error (nunca textos) por gRPC; el Gateway los traduce con i18next al idioma del usuario. Los mensajes de validación también son claves de traducción.
+- Rate limit: una tabla (`Backend/Gateway/src/Shared/RateLimit/RateLimits.ts`) y un único middleware. Un endpoint nuevo queda con el límite general; si necesita otro, se agrega su regla en la tabla. Los routers se montan sin prefijo (la ruta completa va en el controller). Cliente de Valkey: `iovalkey`.
+- Errores: Negocio y Datos devuelven **códigos** de error (nunca textos) por gRPC; el Gateway los traduce con i18next al idioma del usuario. Los mensajes de validación también son claves de traducción. Todo texto que llega al usuario final se traduce: los textos de cada idioma, sus claves (`TranslationKeys`) y el traductor (`createTranslator`, con i18next) viven en `Packages/core/src/Translations`, no en el Gateway. Un mensaje que no llega al usuario (error de arranque, detalle interno, log) puede ir escrito directo.
 
 ## Decisiones de producto
 

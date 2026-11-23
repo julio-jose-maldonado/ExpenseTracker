@@ -60,7 +60,7 @@ jobs:
             echo "$name=$value" >> "$GITHUB_ENV"
           done
       # Mismo compose y mismo script de roles que en local.
-      - run: docker compose up -d --wait postgres
+      - run: docker compose up -d --wait postgres valkey
       - name: Run integration tests
         working-directory: Backend/DataAccess
         env:
@@ -72,9 +72,14 @@ jobs:
         run: |
           DATABASE_PASSWORD="$APP_PASSWORD" MIGRATOR_DATABASE_PASSWORD="$MIGRATOR_PASSWORD" \
             pnpm test:integration
-      - name: Postgres logs on failure
+      - name: Run Gateway integration tests (Valkey)
+        working-directory: Backend/Gateway
+        env:
+          VALKEY_URL: redis://localhost:6380
+        run: pnpm test:integration
+      - name: Container logs on failure
         if: failure()
-        run: docker compose logs postgres
+        run: docker compose logs postgres valkey
 
   secrets:
     name: Secret scan (gitleaks)

@@ -4,8 +4,12 @@ import { ErrorCode } from '../Errors/ErrorCode';
 import { isErrorCode } from '../Errors/IsErrorCode';
 
 // Códigos que describen el request HTTP del cliente. Solo los decide el Gateway: si una capa de abajo
-// devuelve uno, es un error entre servicios y no hay que culpar al cliente con un 400 o un 413.
-const HTTP_REQUEST_CODES: ReadonlySet<ErrorCode> = new Set([ErrorCode.MALFORMED_REQUEST, ErrorCode.PAYLOAD_TOO_LARGE]);
+// devuelve uno, es un error entre servicios y no hay que culpar al cliente con un 400, un 413 o un 429.
+const HTTP_REQUEST_CODES: ReadonlySet<ErrorCode> = new Set([
+  ErrorCode.MALFORMED_REQUEST,
+  ErrorCode.PAYLOAD_TOO_LARGE,
+  ErrorCode.TOO_MANY_REQUESTS,
+]);
 
 // Convierte la falla de una llamada gRPC en un AppError. El error original queda como `cause`, para los logs.
 // Si la capa de abajo mandó un ErrorCode en `details` (lo pone handleUnary), se respeta ese código.

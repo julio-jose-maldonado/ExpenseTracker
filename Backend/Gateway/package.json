@@ -7,7 +7,9 @@
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "jest",
-    "start": "node --env-file-if-exists=.env dist/index.js"
+    "test:integration": "jest --config jest.integration.config.js",
+    "start": "node --env-file-if-exists=.env dist/index.js",
+    "mutation": "stryker run"
   },
   "dependencies": {
     "@expense-tracker/core": "workspace:*",
@@ -15,12 +17,14 @@
     "@grpc/grpc-js": "1.14.7",
     "express": "5.3.0",
     "helmet": "8.3.0",
-    "i18next": "27.0.1",
+    "iovalkey": "0.4.0",
     "reflect-metadata": "0.2.2",
     "tsyringe": "4.10.0"
   },
   "devDependencies": {
     "@expense-tracker/testing": "workspace:*",
+    "@stryker-mutator/core": "10.1.1",
+    "@stryker-mutator/jest-runner": "10.1.1",
     "@types/express": "5.0.6",
     "@types/supertest": "7.2.1",
     "supertest": "7.3.2"

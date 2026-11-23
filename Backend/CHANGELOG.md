@@ -7,6 +7,97 @@ El contrato HTTP para el frontend tiene su propio changelog en [`docs/API_Fronte
 
 ## Historial
 
+### 2026-11-22 · 4d6b909
+
+#### fix(gateway): measure rate limit fallback timing with a monotonic clock
+
+- Gateway · `InMemoryRateLimitStore` y `FallbackRateLimitStore`: por defecto miden vencimientos, limpiezas, el corte y los intervalos de log con `performance.now()` en vez de `Date.now`. Un ajuste de la hora del sistema (NTP) hacia atrás dejaba las claves vencidas como vigentes y apagaba la limpieza (con el tope lleno, las claves nuevas pasaban sin contarse); hacia adelante vencía todas las claves en memoria y podía cerrar el corte antes de tiempo. El número de ventana sigue saliendo de la hora del sistema.
+- Gateway · `createValkeyClient`: el aviso de error de conexión se espacia con `performance.now()`, así un ajuste de la hora no lo silencia.
+- Gateway · `index.ts`: el contador en memoria ya no recibe `Date.now`.
+- Docs: `Decisiones_Tecnicas.md` explica el reloj monotónico y aclara que, con el tope lleno, entre dos limpiezas forzadas (100 ms) una clave nueva puede pasar sin contarse aunque haya vencidas.
+- Tests (con OK del usuario): se agregó 1 en `InMemoryRateLimitStore` y 1 en `FallbackRateLimitStore`, con la hora del sistema que salta, y 2 en `ValkeyClient` (el aviso de conexión sale uno por intervalo y no se adelanta con un salto de la hora). En `InMemoryRateLimitStore` los dos tests de tiempo pasan de 1 s a 3 s de margen y uno cambia de nombre para describir lo que controla. En `FallbackRateLimitStore` las funciones auxiliares salen de sus `describe` (aviso de oxlint) y las dos iguales quedan en una.
+
+### 2026-11-22 · 5276331
+
+#### fix(gateway): throttle the forced purge of the in-memory rate limit store
+
+- Gateway · `InMemoryRateLimitStore`: con el tope lleno, la limpieza forzada corre a lo sumo una vez cada 100 ms, en vez de cada vez que vence una clave. Reemplaza a la cota del vencimiento más próximo del commit anterior: en un ataque las claves vencen de a una por milisegundo y el mapa se volvía a recorrer casi en cada request (20.000 claves nuevas tardaban 59 s; ahora unos ms).
+- Docs: corregido cuándo vence una clave en memoria (`windowSeconds` desde su primer request, no al terminar la ventana) y la decisión de que el respaldo es un modo degradado pasa a su propia sección al final de `Decisiones_Tecnicas.md`.
+- Tests: en `InMemoryRateLimitStore` (existente) se agregó 1 con claves que vencen de a una por milisegundo.
+
+### 2026-11-22 · cd7758c
+
+#### fix(gateway): bound every Valkey call and stop scanning the full memory store
+
+- Gateway · `InMemoryRateLimitStore`: la limpieza forzada con el tope lleno solo recorre el mapa si ya venció alguna clave (cota del vencimiento más próximo). Antes lo recorría entero en cada request con clave nueva: 20.000 claves nuevas con el tope lleno tardaban 295 s.
+- Gateway · `FallbackRateLimitStore`: cada consulta al principal compite con un temporizador de 1 s; si no responde, cuenta como fallo (sigue en memoria, abre el corte, registra el error). Reemplaza al plazo por reloj de la prueba y a la numeración de pruebas, que liberaban el corte pero dejaban colgado el request.
+- Gateway · `App`: el contador en memoria por defecto recibe el logger.
+- Gateway · `stryker.config.mjs`: por defecto no muta `src/generated/`.
+- Tests: en `FallbackRateLimitStore` (existente) se reemplazaron, con OK del usuario, los 3 tests del plazo por reloj por 3 equivalentes con el temporizador, y se suma el caso del principal colgado con el corte cerrado. En `InMemoryRateLimitStore` (existente) se agregó 1 de la limpieza sin recorrer el mapa.
+
+### 2026-11-22 · 599e569
+
+#### fix(gateway): let new keys through when the memory store is full and harden the breaker
+
+- Gateway · `InMemoryRateLimitStore`: con el tope lleno, primero descarta las claves vencidas y, si sigue lleno, una clave nueva pasa sin contarse (devuelve 0) con un `warn` a lo sumo cada 30 s. Reemplaza al contador de desborde compartido, que con un ataque dejaba a toda la instancia en 429 y mezclaba ventanas de reglas distintas. Recibe el logger como tercer parámetro opcional.
+- Gateway · `FallbackRateLimitStore`: solo la prueba cierra el corte (una respuesta tardía de un request anterior al corte ya no lo cierra); la prueba tiene un plazo propio de 1 s y, si vence, cuenta como fallo; un `info` avisa cuando Valkey vuelve.
+- Gateway · `index.ts`: le pasa el logger al contador en memoria.
+- Gateway · `FallbackRateLimitStore.increment` partida en funciones chicas (`#shouldUseFallback`, `#isCurrentProbe`, `#closeIfCurrentProbe`, `#open`): tenía CRAP 12.
+- Gateway · mutation testing con Stryker: `stryker.config.mjs` y script `mutation` (se corre con `--mutate <archivos>`). `.stryker-tmp/` en `.gitignore`.
+- Tests: en `InMemoryRateLimitStore` (existente) los 4 del contador de desborde se reemplazaron por 4 del paso sin contar, la limpieza forzada y el aviso, y se agregó 1 de una clave que vence entre dos limpiezas. En `FallbackRateLimitStore` (existente) se agregaron 7 (respuesta tardía, plazo de la prueba, aviso de recuperación, cierre con requests en paralelo, dos de pruebas vencidas, aviso cada 30 s) y el helper del corte devuelve también las líneas del log. Los últimos salieron de los mutantes sobrevivientes de Stryker.
+
+**Dependencias**
+
+- Gateway · `@stryker-mutator/core`: — → 10.1.1 (dev)
+- Gateway · `@stryker-mutator/jest-runner`: — → 10.1.1 (dev)
+
+### 2026-11-22 · d1e04b8
+
+#### fix(gateway): add a circuit breaker and an overflow counter to the rate limit fallback
+
+- Gateway · `FallbackRateLimitStore`: corte automático. Después de un fallo del principal, durante 5 s cuenta directo en memoria; vencido ese tiempo, un solo request prueba al principal mientras los demás siguen en memoria. Con Valkey colgado, la espera de 250 ms la paga un request por corte y no todos.
+- Gateway · `InMemoryRateLimitStore`: con el tope de claves lleno, las claves nuevas comparten un contador de desborde en vez de desplazar a la más vieja, que le reiniciaba el límite a quien ya lo había pasado.
+- Gateway · `Endpoints.ts`: el comentario dice que también `router` está fijado.
+- Raíz · `pnpm-workspace.yaml`: override `express>router: 2.2.0`, porque el rate limit lee la estructura interna de ese paquete y Express lo pide como `^2.2.0`.
+- Tests: en `FallbackRateLimitStore` (existente) se agregaron 4 del corte y se ajustó "cuando el principal vuelve", que con el corte pasaba por casualidad (ahora avanza el reloj 5 s). En `InMemoryRateLimitStore` (existente) se reemplazó el test del desplazamiento por 4 del contador de desborde.
+
+**Dependencias**
+
+- Raíz · `router` (transitiva de Express): `^2.2.0` (resolvía 2.2.0) → 2.2.0 fijada con override.
+
+### 2026-11-22 · 655e8e9
+
+#### fix(gateway): count rate limits in memory when Valkey fails
+
+- Gateway · `FallbackRateLimitStore`: envuelve al contador de Valkey y, si falla, cuenta en un `InMemoryRateLimitStore` de la instancia en vez de dejar pasar el request sin contar. Registra la caída a lo sumo una vez cada 30 s (`rate limit store failed: counting in memory per instance`).
+- Gateway · `InMemoryRateLimitStore`: tope de 100.000 claves; con el tope lleno, una clave nueva desplaza a la más vieja.
+- Gateway · `index.ts`: el contador de producción es `FallbackRateLimitStore` (Valkey + memoria).
+- Tests nuevos: `FallbackRateLimitStore` (5); en `InMemoryRateLimitStore` (existente) se agregaron 2 del tope.
+
+### 2026-11-15 · 244cd17
+
+#### feat(gateway): add Valkey-backed rate limit and move translations to core
+
+- Gateway · `createRateLimit`: middleware único, antes de leer el body. Ventana fija por IP y por endpoint; pasado el límite responde 429 `TOO_MANY_REQUESTS` con `Retry-After`. Las rutas que no existen comparten una cuenta. Si el contador falla, el request pasa y se registra un error (a lo sumo uno cada 30 s).
+- Gateway · `Shared/RateLimit/RateLimits.ts`: tabla con el límite general (10 por segundo), reglas propias por endpoint y exentos (`GET /isAlive`). La App no arranca si una regla apunta a una ruta que no existe.
+- Gateway · `listEndpoints` / `findEndpointId`: listan las rutas registradas y resuelven a cuál va un request antes del ruteo, con los matchers de Express. Los routers se montan sin prefijo.
+- Gateway · `rateLimitSubjectFromIp`: IPv4 por dirección (también escrita como IPv6), IPv6 por bloque /64.
+- Gateway · `errorCodeFromError`: un parámetro de ruta mal codificado (`URIError` con status 400 del router) sale como 400 `MALFORMED_REQUEST` en vez de 500.
+- Gateway · `IRateLimitStore` con dos implementaciones: `ValkeyRateLimitStore` (script Lua registrado como comando, `INCR` + `EXPIRE` atómico) e `InMemoryRateLimitStore` (por defecto, para tests).
+- Gateway · `createValkeyClient`: cliente `iovalkey` que falla rápido sin conexión (sin cola, 250 ms por comando) y registra los errores de conexión sin tirar el proceso.
+- Gateway · variables: `VALKEY_URL` (obligatoria, `redis://` o `rediss://` con host) y `RATE_LIMIT_GENERAL_MAX` (opcional). `App` recibe `rateLimit` en sus opciones; `trustedProxyHops` pasa a ser opcional.
+- `core` · traducciones: los textos en español, sus claves y el traductor pasan del Gateway a `core` (`Translations`, `es`, `TranslationKeys`, `createTranslator`). Una clave sin texto devuelve el mensaje genérico y deja un `warn`. El Gateway crea el traductor en `App` y pide los mensajes con `TranslationKeys.errors[code]`. Se borra `Gateway/src/Localization`.
+- `core` · `ErrorCode.TOO_MANY_REQUESTS` (gRPC `RESOURCE_EXHAUSTED`); no cruza entre capas, igual que los otros códigos del request HTTP.
+- dependency-cruiser: regla nueva `only-gateway-and-data-access-touch-valkey`; la de la base ya no incluye los clientes de Redis.
+- CI: el job de integración levanta Valkey y corre `test:integration` del Gateway (script y config de Jest nuevos).
+- Tests nuevos: en el Gateway, `RateLimit` (21), `Endpoints` (13), `RateLimitSubject` (7), `InMemoryRateLimitStore` (3), `EnvConfigs` (17), `ErrorCodeFromError` (2), `ValkeyClient` (3) e `Integration/ValkeyRateLimitStore` (4); en `core`, `Grpc/TooManyRequests` (3) `Translations/Translations` (13) y `Translations/CreateTranslator` (4). En `ClientIp` (existente) se agregó `VALKEY_URL` al entorno del test.
+
+**Dependencias**
+
+- Gateway · `iovalkey`: — → 0.4.0
+- Gateway · `i18next`: 27.0.1 → —
+- `core` · `i18next`: — → 27.0.1
+
 ### 2026-11-15 · 0098175
 
 #### feat(core): rebuild AppError across gRPC hops and propagate the deadline

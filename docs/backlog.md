@@ -39,8 +39,8 @@ La historia #1 se hace en varias tandas, cada una con su PR. Se trabaja con TDD.
 | Tanda | Qué entra | Estado |
 |---|---|---|
 | 5 | Errores y deadline entre capas por gRPC, contexto del request (IP, método gRPC), logs por salto | Hecha |
-| 6 | Rate limit en el Gateway, con el cliente de Valkey | Siguiente |
-| 7 | Registro: primera migración, `Packages/types`, argon2id, express-validator | |
+| 6 | Rate limit en el Gateway, con el cliente de Valkey | Hecha |
+| 7 | Registro: primera migración, `Packages/types`, argon2id, express-validator | Siguiente |
 | 8 | Sesión: cookie `httpOnly` guardada en Valkey, middleware de autenticación (login y logout quedan para la historia #2) | |
 | 9 | Gastos: migración de categorías y gastos, crear y listar por usuario, pantallas de la App | |
 
@@ -52,10 +52,16 @@ La historia #1 se hace en varias tandas, cada una con su PR. Se trabaja con TDD.
 - **Por IP** (`client_ip` del contexto). El diseño tiene que permitir otras dos dimensiones, a decidir al implementar:
   - un límite global por endpoint (todos los clientes sumados), para proteger a las capas de abajo. Riesgo: un solo cliente puede agotarlo y dejar afuera al resto, así que tendría que ser bastante más alto que el límite por IP;
   - un límite por usuario, recién cuando exista la sesión (tanda 8), porque antes no hay un `user_id` confiable.
-- **Si Valkey no responde, el request pasa** y se registra un error: una caída de Valkey no puede tirar toda la API.
+- **Si Valkey no responde, se cuenta en memoria** por instancia y se registra un error: una caída de Valkey no puede tirar toda la API, pero tampoco dejarla sin límite.
 - **Hecho a mano**, sin librería: ventana fija con un contador en Valkey. El incremento y el vencimiento de la clave se hacen en una sola operación atómica (script Lua con `INCR` + `EXPIRE`), y la clave incluye el número de ventana, así un contador nunca queda sin vencimiento ni bloquea a alguien para siempre.
 - **Respuesta:** 429 con el código `TOO_MANY_REQUESTS` y el header `Retry-After`.
 - `/isAlive` queda exento (lo consulta el balanceador). El límite general se puede cambiar por variable de entorno; las reglas propias van en el código.
+
+**Hecha el 2026-11-15.** Lo que se decidió al implementar está en `docs/Decisiones_Tecnicas.md`. Quedó para más adelante:
+
+- Límite por usuario: con la sesión (tanda 8).
+- Límite global por endpoint: cuando haya un endpoint que lo necesite. Se agrega como una propiedad más de la política (`RateLimitPolicy`).
+- Reglas propias más bajas para registro y login: con cada uno de esos endpoints (tandas 7 y 8).
 
 ### Aviso de request lento (definido el 2026-11-15, entra con la tanda 7)
 
@@ -63,3 +69,25 @@ La historia #1 se hace en varias tandas, cada una con su PR. Se trabaja con TDD.
 - **El umbral va atado al tiempo que espera la App:** una constante compartida en `Packages/types` (se crea en la tanda 7), que la App usa para cortar el `fetch` y el Gateway para decidir el aviso. Hoy la App no tiene un tiempo máximo de espera: se agrega en ese momento.
 - Lo mismo en la línea de cierre de cada salto gRPC (Business y DataAccess), para ver cuál capa fue la lenta.
 
+
+### Apagado del Gateway con dos señales (anotado el 2026-11-22, sin fecha)
+
+En `Backend/Gateway/src/index.ts`, si llegan dos señales seguidas (SIGTERM de ECS y después SIGINT, o dos Ctrl+C), `shutdown` corre dos veces: el segundo `httpServer.close` responde en el acto con `ERR_SERVER_NOT_RUNNING`, la limpieza se repite y el proceso sale antes de terminar los requests en curso. Se arregla con una bandera `shuttingDown` o registrando las señales con `process.once`. Venía de antes del rate limit; lo encontró la `code-review` de la tanda 6.
+
+### Controles de calidad automáticos (anotado el 2026-11-19, a aplicar pronto)
+
+Idea tomada de Uncle Bob, que no lee el código de sus agentes y en su lugar lo hace pasar por tests y métricas. Acá **no reemplaza la revisión**: la idea es que lo que llegue a revisión ya haya pasado todos los controles automáticos, para que la revisión se concentre en el diseño y en si la implementación es la que se quería. Conviene meterlo ahora, con poco código: los límites arrancan desde el inicio en vez de tener que arreglar deuda después.
+
+Ya existe: typecheck, tests unitarios y de integración, oxlint (`correctness`, `suspicious`), dependency-cruiser con reglas de arquitectura, gitleaks en CI. Falta:
+
+- **Cobertura mínima** por paquete (`coverageThreshold` de Jest y Vitest), que haga fallar los tests si baja.
+- **Complejidad y tamaño:** activar en oxlint `complexity`, `max-lines-per-function`, `max-depth` y `max-params` (la versión 1.92 ya las trae).
+- **Mutation testing con Stryker**, sobre los archivos que cambiaron, antes del push. *(2026-11-22: instalado en el Gateway y corriendo en cada cambio con el skill `ub-mode`; falta en los otros paquetes y en el CI.)* Las mutaciones que sobreviven dicen exactamente qué no controlan los tests.
+
+Cómo se arma:
+
+1. **Medir primero, sin cambiar nada:** cobertura actual de cada paquete, la función más compleja y la más larga, y una corrida de Stryker sobre un módulo chico (porcentaje y tiempo). Los límites salen de esos números, no de valores inventados: desde ahí solo pueden mejorar, y se ajustan de a poco.
+2. **Nivel 1, en cada cambio antes de pasarlo a revisión:** un script `pnpm quality` (typecheck, tests con cobertura mínima, lint con límites, dependency-cruiser). Se puede forzar con un hook de Claude Code para que un cambio no se dé por terminado si falla.
+3. **Nivel 2, antes del push:** Stryker sobre los archivos cambiados, y después las revisiones de siempre (`code-review`, `security-review`, semgrep, segunda opinión con Codex o Gemini).
+4. **CI:** cobertura y límites de complejidad entran solos, porque ya corren `test` y `lint`. Stryker no en cada push, porque es lento: a decidir si va en un job manual o semanal.
+5. **Al pasar un cambio a revisión,** acompañarlo de un resumen corto: controles en verde, porcentaje de mutaciones detectadas en los archivos tocados y las que sobrevivieron.

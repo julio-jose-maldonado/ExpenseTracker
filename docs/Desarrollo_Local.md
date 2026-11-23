@@ -37,7 +37,15 @@ Los `.env.example` vienen vacíos: los valores se completan con las tablas de ab
 
 **`Backend/Business/.env`**: `GRPC_PORT=50051` · `DATA_ACCESS_GRPC_ADDRESS=localhost:50052`
 
-**`Backend/Gateway/.env`**: `PORT=3000` · `BUSINESS_GRPC_ADDRESS=localhost:50051` · `TRUSTED_PROXY_HOPS` vacío (opcional: cuántos proxies propios hay delante del Gateway; en local, ninguno)
+**`Backend/Gateway/.env`**
+
+| Variable | Ejemplo | Nota |
+|---|---|---|
+| `PORT` | `3000` | |
+| `BUSINESS_GRPC_ADDRESS` | `localhost:50051` | |
+| `VALKEY_URL` | `redis://localhost:6380` | El Valkey del compose (el puerto es `VALKEY_PORT` de la raíz) |
+| `TRUSTED_PROXY_HOPS` | vacío | Opcional: cuántos proxies propios hay delante del Gateway; en local, ninguno |
+| `RATE_LIMIT_GENERAL_MAX` | vacío | Opcional: reemplaza el máximo del límite general de requests (10 por segundo por IP y por endpoint) |
 
 ## 2. Levantar
 
@@ -64,9 +72,12 @@ curl localhost:3000/isAlive        # solo el Gateway
 curl localhost:3000/isAliveChain   # Gateway → Business → DataAccess → Postgres
 pnpm test                          # unitarios del backend (Jest) y de la App (Vitest), sin Docker
 pnpm --filter @expense-tracker/data-access test:integration   # contra el Postgres del compose
+pnpm --filter @expense-tracker/gateway test:integration       # contra el Valkey del compose
 ```
 
-Los tests de integración y drizzle-kit toman las variables de `Backend/DataAccess/.env`.
+Los tests de integración y drizzle-kit toman las variables de `Backend/DataAccess/.env`; los del Gateway, `VALKEY_URL` de `Backend/Gateway/.env` (sin la variable usan `redis://127.0.0.1:6380`).
+
+Si el Gateway arranca sin Valkey levantado, atiende igual con el límite contado en memoria, y lo avisa con un error en el log.
 
 ## 4. Apagar
 

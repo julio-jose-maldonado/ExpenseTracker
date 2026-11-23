@@ -73,7 +73,14 @@ module.exports = {
       name: 'only-data-access-touches-the-database',
       severity: 'error',
       from: { path: '^(Backend/(Gateway|Business)|Packages)/' },
-      to: { path: 'node_modules/(drizzle-orm|drizzle-kit|pg|ioredis|redis)/' },
+      to: { path: 'node_modules/(drizzle-orm|drizzle-kit|pg)/' },
+    },
+    {
+      name: 'only-gateway-and-data-access-touch-valkey',
+      comment: 'Valkey lo usan el Gateway (rate limit, sesiones) y DataAccess (cache general). Business no.',
+      severity: 'error',
+      from: { path: '^(Backend/Business|Packages)/' },
+      to: { path: 'node_modules/(iovalkey|ioredis|redis)/' },
     },
   ],
   options: {

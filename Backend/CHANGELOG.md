@@ -9,6 +9,14 @@ El contrato HTTP para el frontend tiene su propio changelog en [`docs/API_Fronte
 
 ### 2026-11-22 · (SHA al commitear)
 
+#### fix(gateway): throttle the forced purge of the in-memory rate limit store
+
+- Gateway · `InMemoryRateLimitStore`: con el tope lleno, la limpieza forzada corre a lo sumo una vez cada 100 ms, en vez de cada vez que vence una clave. Reemplaza a la cota del vencimiento más próximo del commit anterior: en un ataque las claves vencen de a una por milisegundo y el mapa se volvía a recorrer casi en cada request (20.000 claves nuevas tardaban 59 s; ahora unos ms).
+- Docs: corregido cuándo vence una clave en memoria (`windowSeconds` desde su primer request, no al terminar la ventana) y la decisión de que el respaldo es un modo degradado pasa a su propia sección al final de `Decisiones_Tecnicas.md`.
+- Tests: en `InMemoryRateLimitStore` (existente) se agregó 1 con claves que vencen de a una por milisegundo.
+
+### 2026-11-22 · (SHA al commitear)
+
 #### fix(gateway): bound every Valkey call and stop scanning the full memory store
 
 - Gateway · `InMemoryRateLimitStore`: la limpieza forzada con el tope lleno solo recorre el mapa si ya venció alguna clave (cota del vencimiento más próximo). Antes lo recorría entero en cada request con clave nueva: 20.000 claves nuevas con el tope lleno tardaban 295 s.

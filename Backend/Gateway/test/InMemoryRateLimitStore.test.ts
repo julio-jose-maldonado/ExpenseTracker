@@ -94,6 +94,25 @@ describe('InMemoryRateLimitStore', () => {
     expect(performance.now() - started).toBeLessThan(1_000);
   });
 
+  it('con el tope lleno y una clave venciendo por milisegundo, no recorre el mapa en cada request', async () => {
+    let nowMs = 0;
+    const store = new InMemoryRateLimitStore(() => nowMs, 20_000);
+    // Como en un ataque real: cada clave entra en un milisegundo distinto, así vencen de a una.
+    for (let i = 0; i < 20_000; i++) {
+      nowMs = i;
+      await store.increment(`k${i}`, 100);
+    }
+
+    // Recorriendo el mapa cada vez que vence una clave serían 400 millones de vueltas.
+    const started = performance.now();
+    for (let i = 0; i < 20_000; i++) {
+      nowMs = 100_000 + i;
+      await store.increment(`n${i}`, 100);
+    }
+
+    expect(performance.now() - started).toBeLessThan(1_000);
+  });
+
   it('con el tope lleno avisa en el log a lo sumo una vez por intervalo', async () => {
     let nowMs = 0;
     const lines: Array<Record<string, unknown>> = [];
